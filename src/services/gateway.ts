@@ -1,5 +1,5 @@
 // Gateway WebSocket 服务（单例模式）
-// 专家建议 #12：必须是单例，否则多个组件各自实例化会创建多个 WebSocket 连接
+// 心跳保活 + 并发控制 + 自动重连
 
 interface PendingRequest {
   resolve: (value: unknown) => void
@@ -14,6 +14,13 @@ interface QueuedRequest {
   reject: (reason: unknown) => void
 }
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+
+export interface GatewayEvent {
+  method: string
+  params?: unknown
+}
+
 export class GatewayService {
   private static instance: GatewayService | null = null
 
@@ -21,22 +28,31 @@ export class GatewayService {
   private pendingRequests = new Map<string, PendingRequest>()
   private eventHandlers = new Map<string, Set<Function>>()
 
-  // 心跳保活（专家建议 #4）
+  // 心跳
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  private heartbeatInterval = 30_000 // 30秒
+  private heartbeatInterval = 30_000
+  private missedHeartbeats = 0
+  private maxMissedHeartbeats = 2
 
-  // 请求超时
-  private requestTimeout = 10_000 // 10秒
+  // 重连
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-  // 并发控制（专家建议 #4）
+  // 请求控制
+  private requestTimeout = 10_000
   private maxConcurrent = 10
   private activeRequests = 0
   private requestQueue: QueuedRequest[] = []
+  private maxMessageSize = 1024 * 1024
 
-  // 消息大小限制
-  private maxMessageSize = 1024 * 1024 // 1MB
+  // 状态
+  private _status: ConnectionStatus = 'disconnected'
+  private _url = ''
+  private _token = ''
+  private statusListeners = new Set<(status: ConnectionStatus) => void>()
 
-  private constructor() {} // 禁止外部实例化
+  private constructor() {}
 
   static getInstance(): GatewayService {
     if (!GatewayService.instance) {
@@ -45,48 +61,120 @@ export class GatewayService {
     return GatewayService.instance
   }
 
-  // 消息 ID 生成
+  get status(): ConnectionStatus {
+    return this._status
+  }
+
+  get url(): string {
+    return this._url
+  }
+
+  private setStatus(status: ConnectionStatus): void {
+    this._status = status
+    this.statusListeners.forEach((listener) => listener(status))
+  }
+
+  onStatusChange(listener: (status: ConnectionStatus) => void): () => void {
+    this.statusListeners.add(listener)
+    return () => { this.statusListeners.delete(listener) }
+  }
+
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   }
 
-  // 连接（自动心跳）
+  // 连接
   async connect(url: string, token: string): Promise<void> {
+    this._url = url
+    this._token = token
+    this.reconnectAttempts = 0
+    return this.doConnect()
+  }
+
+  private doConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(url)
+      this.setStatus('connecting')
+      this.cleanup()
+
+      try {
+        this.ws = new WebSocket(this._url)
+      } catch (e) {
+        this.setStatus('disconnected')
+        reject(new Error(`Invalid WebSocket URL: ${this._url}`))
+        return
+      }
+
+      const connectTimeout = setTimeout(() => {
+        this.ws?.close()
+        this.setStatus('disconnected')
+        reject(new Error('Connection timeout'))
+      }, 5000)
 
       this.ws.onopen = () => {
-        // 发送认证
+        clearTimeout(connectTimeout)
+        // Send auth
         this.ws?.send(JSON.stringify({
           jsonrpc: '2.0',
           id: this.generateId(),
           method: 'connect',
-          params: { auth: { token } },
+          params: { auth: { token: this._token } },
         }))
-        // 启动心跳
+        this.setStatus('connected')
+        this.reconnectAttempts = 0
         this.startHeartbeat()
         resolve()
       }
 
       this.ws.onmessage = (event) => {
-        this.handleMessage(event.data)
+        this.missedHeartbeats = 0
+        this.handleMessage(event.data as string)
       }
 
-      this.ws.onerror = (error) => {
-        reject(error)
+      this.ws.onerror = () => {
+        clearTimeout(connectTimeout)
+        this.setStatus('disconnected')
+        reject(new Error('WebSocket connection error'))
       }
 
       this.ws.onclose = () => {
+        clearTimeout(connectTimeout)
         this.stopHeartbeat()
         this.ws = null
+        if (this._status === 'connected') {
+          this.tryReconnect()
+        }
       }
     })
   }
 
+  // 重连
+  private tryReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.setStatus('disconnected')
+      return
+    }
+
+    this.setStatus('reconnecting')
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+    this.reconnectAttempts++
+
+    this.reconnectTimer = setTimeout(() => {
+      this.doConnect().catch(() => {
+        this.tryReconnect()
+      })
+    }, delay)
+  }
+
   // 心跳
   private startHeartbeat(): void {
+    this.missedHeartbeats = 0
     this.heartbeatTimer = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
+        if (this.missedHeartbeats >= this.maxMissedHeartbeats) {
+          this.ws.close()
+          return
+        }
+        this.missedHeartbeats++
         this.ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'ping' }))
       }
     }, this.heartbeatInterval)
@@ -99,21 +187,18 @@ export class GatewayService {
     }
   }
 
-  // RPC 调用（带超时 + 并发控制）
+  // RPC 调用
   async request<T>(method: string, params?: object): Promise<T> {
-    // 并发控制
     if (this.activeRequests >= this.maxConcurrent) {
       return new Promise((resolve, reject) => {
-        this.requestQueue.push({ method, params, resolve, reject })
+        this.requestQueue.push({ method, params, resolve: resolve as (v: unknown) => void, reject })
       })
     }
-
     return this.doRequest<T>(method, params)
   }
 
-  private async doRequest<T>(method: string, params?: object): Promise<T> {
+  private doRequest<T>(method: string, params?: object): Promise<T> {
     this.activeRequests++
-
     return new Promise((resolve, reject) => {
       const id = this.generateId()
 
@@ -125,7 +210,7 @@ export class GatewayService {
       }, this.requestTimeout)
 
       this.pendingRequests.set(id, {
-        resolve: resolve as (value: unknown) => void,
+        resolve: resolve as (v: unknown) => void,
         reject,
         timer,
       })
@@ -158,19 +243,18 @@ export class GatewayService {
     }
   }
 
-  // 处理收到的消息
+  // 消息处理
   private handleMessage(data: string): void {
     try {
       const msg = JSON.parse(data)
 
-      // RPC 响应
+      // RPC response
       if (msg.id && this.pendingRequests.has(msg.id)) {
         const pending = this.pendingRequests.get(msg.id)!
         clearTimeout(pending.timer)
         this.pendingRequests.delete(msg.id)
         this.activeRequests--
         this.processQueue()
-
         if (msg.error) {
           pending.reject(msg.error)
         } else {
@@ -179,7 +263,7 @@ export class GatewayService {
         return
       }
 
-      // 事件
+      // Event
       if (msg.method) {
         const handlers = this.eventHandlers.get(msg.method)
         if (handlers) {
@@ -187,7 +271,7 @@ export class GatewayService {
         }
       }
     } catch {
-      // 忽略无法解析的消息
+      // Ignore unparseable messages
     }
   }
 
@@ -197,18 +281,28 @@ export class GatewayService {
       this.eventHandlers.set(event, new Set())
     }
     this.eventHandlers.get(event)!.add(handler)
-
-    // 返回取消订阅函数
-    return () => {
-      this.eventHandlers.get(event)?.delete(handler)
-    }
+    return () => { this.eventHandlers.get(event)?.delete(handler) }
   }
 
   // 断开
   disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    this.reconnectAttempts = this.maxReconnectAttempts // Prevent auto-reconnect
+    this.cleanup()
+    this.setStatus('disconnected')
+  }
+
+  private cleanup(): void {
     this.stopHeartbeat()
     this.ws?.close()
     this.ws = null
+    this.pendingRequests.forEach((p) => {
+      clearTimeout(p.timer)
+      p.reject(new Error('Disconnected'))
+    })
     this.pendingRequests.clear()
     this.requestQueue = []
     this.activeRequests = 0

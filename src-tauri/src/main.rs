@@ -8,6 +8,7 @@ fn main() {
             commands::system::check_node_version,
             commands::system::check_openclaw_installed,
             commands::system::check_gateway_status,
+            commands::system::read_gateway_token,
             commands::config::read_config,
             commands::process::start_gateway,
             commands::process::stop_gateway,

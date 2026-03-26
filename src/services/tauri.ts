@@ -25,3 +25,7 @@ export async function startGateway(): Promise<string> {
 export async function stopGateway(): Promise<string> {
   return invoke('stop_gateway')
 }
+
+export async function readGatewayToken(): Promise<string | null> {
+  return invoke('read_gateway_token')
+}

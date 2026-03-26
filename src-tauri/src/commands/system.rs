@@ -156,3 +156,29 @@ pub async fn check_gateway_status() -> Result<GatewayStatus, AppError> {
         }
     }
 }
+
+#[tauri::command]
+pub async fn read_gateway_token() -> Result<Option<String>, AppError> {
+    let config_path = platform::config_file_path();
+    if !config_path.exists() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(&config_path)?;
+
+    // Parse as generic JSON value to find gateway.auth.token
+    let value: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| AppError::new(
+            crate::error::ErrorCode::ConfigParseError,
+            "Failed to parse openclaw.json",
+        ).with_detail(&e.to_string()))?;
+
+    let token = value
+        .get("gateway")
+        .and_then(|g| g.get("auth"))
+        .and_then(|a| a.get("token"))
+        .and_then(|t| t.as_str())
+        .map(|s| s.to_string());
+
+    Ok(token)
+}
