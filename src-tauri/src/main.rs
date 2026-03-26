@@ -1,4 +1,6 @@
 mod commands;
+mod error;
+mod platform;
 
 fn main() {
     tauri::Builder::default()
@@ -9,6 +11,8 @@ fn main() {
             commands::config::read_config,
             commands::process::start_gateway,
             commands::process::stop_gateway,
+            commands::backup::backup_config,
+            commands::backup::restore_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

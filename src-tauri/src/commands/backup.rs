@@ -1,11 +1,13 @@
+use crate::error::{AppError, ErrorCode};
+
 #[tauri::command]
-pub async fn backup_config() -> Result<String, String> {
-    // TODO: 实现真实备份
-    Err("Not implemented".to_string())
+pub async fn backup_config() -> Result<String, AppError> {
+    // TODO: M10 模块实现
+    Err(AppError::new(ErrorCode::Unknown, "备份功能尚未实现"))
 }
 
 #[tauri::command]
-pub async fn restore_config(backup_path: String) -> Result<String, String> {
-    // TODO: 实现真实恢复
-    Err(format!("Not implemented: {}", backup_path))
+pub async fn restore_config(backup_path: String) -> Result<String, AppError> {
+    // TODO: M10 模块实现
+    Err(AppError::new(ErrorCode::Unknown, &format!("恢复功能尚未实现: {}", backup_path)))
 }
