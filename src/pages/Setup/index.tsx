@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Card, Typography, Tag, Button, Spin, Space, Steps, Divider, Alert } from 'antd'
 import {
   CheckCircleOutlined,
@@ -10,8 +10,8 @@ import {
   SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../services/tauri'
-import type { NodeInfo, OpenClawInfo, GatewayStatus } from '../types/openclaw'
+import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../../services/tauri'
+import type { NodeInfo, OpenClawInfo, GatewayStatus } from '../../types/openclaw'
 
 const { Title, Text } = Typography
 
@@ -68,8 +68,8 @@ export default function SetupPage() {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Title level={3}>🦞 安装向导</Title>
-      <Text type="secondary">检测你的环境，确保 OpenClaw 正常运行</Text>
+      <Title level={3}>馃 瀹夎鍚戝</Title>
+      <Text type="secondary">妫€娴嬩綘鐨勭幆澧冿紝纭繚 OpenClaw 姝ｅ父杩愯</Text>
 
       <Divider />
 
@@ -77,10 +77,10 @@ export default function SetupPage() {
         current={getStepStatus()}
         status={allReady ? 'finish' : 'process'}
         items={[
-          { title: 'Node.js', description: '运行环境' },
-          { title: 'OpenClaw', description: 'AI 助手平台' },
-          { title: 'Gateway', description: '服务运行中' },
-          { title: '完成', description: '可以使用了' },
+          { title: 'Node.js', description: '杩愯鐜' },
+          { title: 'OpenClaw', description: 'AI 鍔╂墜骞冲彴' },
+          { title: 'Gateway', description: '鏈嶅姟杩愯涓? },
+          { title: '瀹屾垚', description: '鍙互浣跨敤浜? },
         ]}
       />
 
@@ -89,7 +89,7 @@ export default function SetupPage() {
           <Card>
             <div style={{ textAlign: 'center', padding: 40 }}>
               <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
-              <div style={{ marginTop: 16 }}>正在检测环境...</div>
+              <div style={{ marginTop: 16 }}>姝ｅ湪妫€娴嬬幆澧?..</div>
             </div>
           </Card>
         ) : (
@@ -104,21 +104,21 @@ export default function SetupPage() {
               }
               extra={
                 nodeInfo?.installed ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>已安装</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>宸插畨瑁?/Tag>
                 ) : (
-                  <Tag color="error" icon={<CloseCircleOutlined />}>未安装</Tag>
+                  <Tag color="error" icon={<CloseCircleOutlined />}>鏈畨瑁?/Tag>
                 )
               }
             >
               {nodeInfo?.installed ? (
                 <Space direction="vertical">
-                  <Text>版本: <strong>{nodeInfo.version}</strong></Text>
+                  <Text>鐗堟湰: <strong>{nodeInfo.version}</strong></Text>
                   {nodeInfo.meets_minimum ? (
-                    <Text type="success">✅ 版本满足最低要求 (≥ 22.14)</Text>
+                    <Text type="success">鉁?鐗堟湰婊¤冻鏈€浣庤姹?(鈮?22.14)</Text>
                   ) : (
                     <Alert
                       type="warning"
-                      message="版本过低，建议升级到 Node.js 24"
+                      message="鐗堟湰杩囦綆锛屽缓璁崌绾у埌 Node.js 24"
                       showIcon
                     />
                   )}
@@ -126,8 +126,8 @@ export default function SetupPage() {
               ) : (
                 <Alert
                   type="error"
-                  message="未检测到 Node.js"
-                  description="请先安装 Node.js 24+: https://nodejs.org"
+                  message="鏈娴嬪埌 Node.js"
+                  description="璇峰厛瀹夎 Node.js 24+: https://nodejs.org"
                   showIcon
                 />
               )}
@@ -143,36 +143,36 @@ export default function SetupPage() {
               }
               extra={
                 openclawInfo?.installed ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>已安装</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>宸插畨瑁?/Tag>
                 ) : (
-                  <Tag color="error" icon={<CloseCircleOutlined />}>未安装</Tag>
+                  <Tag color="error" icon={<CloseCircleOutlined />}>鏈畨瑁?/Tag>
                 )
               }
             >
               {openclawInfo?.installed ? (
                 <Space direction="vertical">
-                  <Text>版本: <strong>{openclawInfo.version}</strong></Text>
+                  <Text>鐗堟湰: <strong>{openclawInfo.version}</strong></Text>
                   {openclawInfo.path && (
-                    <Text type="secondary" style={{ fontSize: 12 }}>路径: {openclawInfo.path}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>璺緞: {openclawInfo.path}</Text>
                   )}
                 </Space>
               ) : (
                 <Space direction="vertical">
                   <Alert
                     type="warning"
-                    message="未检测到 OpenClaw"
-                    description="需要先安装 OpenClaw 才能使用"
+                    message="鏈娴嬪埌 OpenClaw"
+                    description="闇€瑕佸厛瀹夎 OpenClaw 鎵嶈兘浣跨敤"
                     showIcon
                   />
                   <Button
                     type="primary"
                     loading={actionLoading === 'install'}
                     onClick={() => {
-                      // 安装功能待 M1 完善
+                      // 瀹夎鍔熻兘寰?M1 瀹屽杽
                       window.open('https://docs.openclaw.ai/start/getting-started', '_blank')
                     }}
                   >
-                    查看安装指南
+                    鏌ョ湅瀹夎鎸囧崡
                   </Button>
                 </Space>
               )}
@@ -188,22 +188,22 @@ export default function SetupPage() {
               }
               extra={
                 gatewayStatus?.running ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>运行中</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>杩愯涓?/Tag>
                 ) : (
-                  <Tag color="default" icon={<CloseCircleOutlined />}>未运行</Tag>
+                  <Tag color="default" icon={<CloseCircleOutlined />}>鏈繍琛?/Tag>
                 )
               }
             >
               {gatewayStatus?.running ? (
                 <Space direction="vertical">
-                  <Text>端口: <strong>{gatewayStatus.port}</strong></Text>
+                  <Text>绔彛: <strong>{gatewayStatus.port}</strong></Text>
                   {gatewayStatus.pid && (
                     <Text type="secondary">PID: {gatewayStatus.pid}</Text>
                   )}
                 </Space>
               ) : (
                 <Space direction="vertical">
-                  <Text>Gateway 未运行，需要启动后才能使用</Text>
+                  <Text>Gateway 鏈繍琛岋紝闇€瑕佸惎鍔ㄥ悗鎵嶈兘浣跨敤</Text>
                   <Button
                     type="primary"
                     icon={<SyncOutlined />}
@@ -211,7 +211,7 @@ export default function SetupPage() {
                     onClick={handleStartGateway}
                     disabled={!openclawInfo?.installed}
                   >
-                    启动 Gateway
+                    鍚姩 Gateway
                   </Button>
                 </Space>
               )}
@@ -224,8 +224,8 @@ export default function SetupPage() {
         <div style={{ marginTop: 24, textAlign: 'center' }}>
           <Alert
             type="success"
-            message="所有环境已就绪！"
-            description="你的 OpenClaw 已经可以正常使用了"
+            message="鎵€鏈夌幆澧冨凡灏辩华锛?
+            description="浣犵殑 OpenClaw 宸茬粡鍙互姝ｅ父浣跨敤浜?
             showIcon
           />
           <Button
@@ -234,15 +234,13 @@ export default function SetupPage() {
             style={{ marginTop: 16 }}
             onClick={() => navigate('/dashboard')}
           >
-            进入主界面 →
-          </Button>
+            杩涘叆涓荤晫闈?鈫?          </Button>
         </div>
       )}
 
       <div style={{ marginTop: 16, textAlign: 'center' }}>
         <Button type="link" onClick={detectAll} loading={loading}>
-          <SyncOutlined /> 重新检测
-        </Button>
+          <SyncOutlined /> 閲嶆柊妫€娴?        </Button>
       </div>
     </div>
   )
