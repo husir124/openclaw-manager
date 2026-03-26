@@ -121,7 +121,20 @@ export class GatewayService {
         if (resolved) return
         resolved = true
 
-        this.log('Connected (auth sent during handshake via query param)')
+        this.log('Connected (auth via query param), registering as client...')
+
+        // Send initial presence registration (Gateway expects this to keep connection alive)
+        try {
+          this.ws?.send(JSON.stringify({
+            jsonrpc: '2.0',
+            id: this.generateId(),
+            method: 'system-presence',
+            params: { role: 'control-ui' },
+          }))
+        } catch (e) {
+          this.log(`Failed to send presence: ${e}`)
+        }
+
         this.setStatus('connected')
         this.reconnectAttempts = 0
         this.lastMessageTime = Date.now()
@@ -220,14 +233,13 @@ export class GatewayService {
           // Don't close - let the OS/TCP layer detect it
           // Just log the warning
         }
-        // Send a lightweight message to keep the connection alive
-        // Use "status" method which is a valid Gateway RPC call
+        // Send system-presence to keep connection alive (valid Gateway method)
         try {
           this.ws.send(JSON.stringify({
             jsonrpc: '2.0',
             id: this.generateId(),
-            method: 'status',
-            params: {},
+            method: 'system-presence',
+            params: { role: 'control-ui' },
           }))
         } catch {
           // Connection is dead
