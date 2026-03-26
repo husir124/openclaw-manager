@@ -14,5 +14,14 @@ export default defineConfig({
     // Tauri 在固定端口上需要 strictPort
     strictPort: true,
     port: 5173,
+
+    // 代理 /gateway 到 OpenClaw Gateway（用于嵌入官方 Control UI）
+    proxy: {
+      '/gateway': {
+        target: 'http://127.0.0.1:18789',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })
