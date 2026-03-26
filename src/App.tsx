@@ -8,6 +8,7 @@ import ChannelsPage from './pages/Channels'
 import AgentsPage from './pages/Agents'
 import SkillsPage from './pages/Skills'
 import HealthPage from './pages/Health'
+import ConfigPage from './pages/Config'
 import SettingsPage from './pages/Settings'
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/skills" element={<SkillsPage />} />
         <Route path="/health" element={<HealthPage />} />
+        <Route path="/config" element={<ConfigPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

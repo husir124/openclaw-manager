@@ -10,6 +10,7 @@ import {
   HeartOutlined,
   SettingOutlined,
   RocketOutlined,
+  CodeOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useGatewayStore } from '../stores/gatewayStore'
@@ -27,6 +28,7 @@ const menuItems = [
   { key: '/agents', icon: <RobotOutlined />, label: 'Agents' },
   { key: '/skills', icon: <AppstoreOutlined />, label: 'Skills' },
   { key: '/health', icon: <HeartOutlined />, label: 'Health' },
+  { key: '/config', icon: <CodeOutlined />, label: 'Config' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ]
 
