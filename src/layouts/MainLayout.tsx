@@ -8,6 +8,7 @@ import {
   AppstoreOutlined,
   HeartOutlined,
   SettingOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
@@ -16,7 +17,8 @@ const { Header, Sider, Content } = Layout
 const { Title } = Typography
 
 const menuItems = [
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
+  { key: '/setup', icon: <RocketOutlined />, label: 'Setup' },
+  { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
   { key: '/chat', icon: <MessageOutlined />, label: '聊天' },
   { key: '/models', icon: <CloudServerOutlined />, label: '模型配置' },
   { key: '/channels', icon: <ApiOutlined />, label: '渠道配置' },

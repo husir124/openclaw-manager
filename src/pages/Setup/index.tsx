@@ -109,7 +109,7 @@ export default function SetupPage() {
                 <Space direction="vertical">
                   <Text>Version: <strong>{nodeInfo.version}</strong></Text>
                   {nodeInfo.meets_minimum ? (
-                    <Text type="success">Version OK (>= 22.14)</Text>
+                    <Text type="success">{'Version OK (>= 22.14)'}</Text>
                   ) : (
                     <Alert type="warning" message="Version too low, upgrade to Node.js 24" showIcon />
                   )}
