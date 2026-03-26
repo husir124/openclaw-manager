@@ -6,18 +6,19 @@ import { readGatewayToken } from '../services/tauri'
 export function useGateway() {
   const { status, url, token, setStatus, setToken, setError } = useGatewayStore()
 
-  // Listen to status changes from the service
   useEffect(() => {
     const unsub = gatewayService.onStatusChange((newStatus) => {
       setStatus(newStatus)
+      // Check for errors from the service
+      if (gatewayService.lastError) {
+        setError(gatewayService.lastError)
+      }
     })
     return unsub
-  }, [setStatus])
+  }, [setStatus, setError])
 
-  // Auto-connect on mount
   useEffect(() => {
     const autoConnect = async () => {
-      // Try to read token from openclaw.json if not set
       let currentToken = token
       if (!currentToken) {
         try {
@@ -27,7 +28,7 @@ export function useGateway() {
             setToken(result)
           }
         } catch {
-          // Token not available, user needs to enter it manually
+          // Token not available
         }
       }
 
@@ -35,7 +36,8 @@ export function useGateway() {
         try {
           await gatewayService.connect(url, currentToken)
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Connection failed')
+          const msg = err instanceof Error ? err.message : 'Connection failed'
+          setError(msg)
         }
       }
     }
@@ -52,7 +54,8 @@ export function useGateway() {
     try {
       await gatewayService.connect(connectUrl, connectToken)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection failed')
+      const msg = err instanceof Error ? err.message : 'Connection failed'
+      setError(msg)
       throw err
     }
   }, [setError])

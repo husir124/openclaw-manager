@@ -7,10 +7,12 @@ interface GatewayState {
   token: string
   error: string | null
   connectedAt: number | null
+  lastCloseCode: number | null
   setStatus: (status: ConnectionStatus) => void
   setUrl: (url: string) => void
   setToken: (token: string) => void
   setError: (error: string | null) => void
+  setLastCloseCode: (code: number | null) => void
   reset: () => void
 }
 
@@ -20,17 +22,19 @@ export const useGatewayStore = create<GatewayState>((set) => ({
   token: '',
   error: null,
   connectedAt: null,
+  lastCloseCode: null,
   setStatus: (status) => set({
     status,
     connectedAt: status === 'connected' ? Date.now() : null,
-    error: status === 'disconnected' ? null : undefined,
   }),
   setUrl: (url) => set({ url }),
   setToken: (token) => set({ token }),
   setError: (error) => set({ error }),
+  setLastCloseCode: (code) => set({ lastCloseCode: code }),
   reset: () => set({
     status: 'disconnected',
     error: null,
     connectedAt: null,
+    lastCloseCode: null,
   }),
 }))
