@@ -96,7 +96,10 @@ export class GatewayService {
       this.cleanup()
 
       try {
-        this.ws = new WebSocket(this._url)
+        // Pass token as query parameter (Gateway expects auth during WS handshake)
+        const sep = this._url.includes('?') ? '&' : '?'
+        const urlWithToken = `${this._url}${sep}token=${encodeURIComponent(this._token)}`
+        this.ws = new WebSocket(urlWithToken)
       } catch {
         this.setStatus('disconnected')
         reject(new Error('Invalid WebSocket URL'))
@@ -118,14 +121,7 @@ export class GatewayService {
         if (resolved) return
         resolved = true
 
-        this.log('Connected, sending auth...')
-        this.ws?.send(JSON.stringify({
-          jsonrpc: '2.0',
-          id: this.generateId(),
-          method: 'connect',
-          params: { auth: { token: this._token } },
-        }))
-
+        this.log('Connected (auth sent during handshake via query param)')
         this.setStatus('connected')
         this.reconnectAttempts = 0
         this.lastMessageTime = Date.now()
