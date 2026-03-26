@@ -1,79 +1,59 @@
-// 嵌入 OpenClaw 官方 Control UI
-// Gateway 在 127.0.0.1:18789 上同时提供 HTTP 和 WebSocket
-// 我们用 iframe 直接嵌入官方 UI，利用它已经实现的完整协议
+// Chat 页面：管理聊天相关配置，聊天本身跳转到官方 Control UI
+import { Card, Typography, Button, Space, Alert } from 'antd'
+import { MessageOutlined, LinkOutlined, ApiOutlined } from '@ant-design/icons'
 
-import { useState, useEffect, useRef } from 'react'
-import { Spin, Alert, Button, Typography } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
-
-const { Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
 export default function ChatPage() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-
   const gatewayUrl = 'http://127.0.0.1:18789'
 
-  useEffect(() => {
-    // Check if Gateway is reachable
-    const checkGateway = async () => {
-      try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 3000)
-        await fetch(gatewayUrl, { signal: controller.signal })
-        clearTimeout(timeout)
-        setLoading(false)
-      } catch {
-        setError('Gateway is not running on port 18789')
-        setLoading(false)
-      }
-    }
-    checkGateway()
-  }, [])
-
-  if (error) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Alert
-          type="warning"
-          message="Cannot connect to Gateway"
-          description={error}
-          showIcon
-        />
-        <Button
-          icon={<ReloadOutlined />}
-          style={{ marginTop: 16 }}
-          onClick={() => { setError(null); setLoading(true) }}
-        >
-          Retry
-        </Button>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <Spin size="large" />
-        <Text style={{ marginLeft: 16 }}>Connecting to Gateway...</Text>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ height: '100%', width: '100%' }}>
-      <iframe
-        ref={iframeRef}
-        src={gatewayUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          borderRadius: 8,
-        }}
-        title="OpenClaw Control UI"
-      />
+    <div style={{ maxWidth: 700, margin: '0 auto' }}>
+      <Title level={3}>
+        <MessageOutlined /> Chat
+      </Title>
+      <Paragraph type="secondary">
+        OpenClaw Manager focuses on configuration and management.
+        For chatting with your AI assistant, use the official Control UI.
+      </Paragraph>
+
+      <Card style={{ marginTop: 24 }}>
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div>
+            <Title level={5}><ApiOutlined /> Official Control UI</Title>
+            <Paragraph>
+              The official Control UI provides full chat functionality including
+              streaming responses, tool call visualization, and session management.
+            </Paragraph>
+            <Button
+              type="primary"
+              icon={<LinkOutlined />}
+              size="large"
+              onClick={() => window.open(gatewayUrl, '_blank')}
+            >
+              Open Control UI ({gatewayUrl})
+            </Button>
+          </div>
+
+          <Alert
+            type="info"
+            message="Why a separate Control UI?"
+            description="OpenClaw Gateway uses a complex WebSocket protocol with device identity signing, challenge-response handshake, and protocol version negotiation. Rather than reimplementing this, OpenClaw Manager focuses on what it does best: making setup, configuration, and management easy."
+            showIcon
+          />
+
+          <div>
+            <Title level={5}>What OpenClaw Manager provides</Title>
+            <ul>
+              <li><strong>Setup Wizard</strong> - Detect Node.js, install OpenClaw, start Gateway</li>
+              <li><strong>Config Editor</strong> - Visual editor for openclaw.json</li>
+              <li><strong>Agent Manager</strong> - Create and manage AI agents</li>
+              <li><strong>Health Monitor</strong> - Diagnostics and auto-repair</li>
+              <li><strong>Backup & Restore</strong> - Encrypted config backups</li>
+            </ul>
+          </div>
+        </Space>
+      </Card>
     </div>
   )
 }

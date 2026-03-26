@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Layout, Menu, Typography, Badge, Modal, Input, Button, Space, Alert } from 'antd'
+import { useState, useEffect } from 'react'
+import { Layout, Menu, Typography, Badge, Tag, Modal } from 'antd'
 import {
   DashboardOutlined,
   MessageOutlined,
@@ -10,12 +10,10 @@ import {
   HeartOutlined,
   SettingOutlined,
   RocketOutlined,
-  LinkOutlined,
-  DisconnectOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useGatewayStore } from '../stores/gatewayStore'
-import { useGateway } from '../hooks/useGateway'
+import { checkGatewayStatus } from '../services/tauri'
 
 const { Header, Sider, Content } = Layout
 const { Title, Text } = Typography
@@ -32,49 +30,39 @@ const menuItems = [
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ]
 
-const statusConfig = {
-  disconnected: { color: '#ff4d4f', text: 'Disconnected' },
-  connecting: { color: '#faad14', text: 'Connecting...' },
-  connected: { color: '#52c41a', text: 'Connected' },
-  reconnecting: { color: '#faad14', text: 'Reconnecting...' },
-}
-
 export default function MainLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { status, url, token, error, setUrl, setToken } = useGatewayStore()
-  const { connect, disconnect } = useGateway()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [connectLoading, setConnectLoading] = useState(false)
-  const [inputUrl, setInputUrl] = useState(url)
-  const [inputToken, setInputToken] = useState(token)
+  const { processStatus, port, pid, setProcessStatus } = useGatewayStore()
+  const [showInfo, setShowInfo] = useState(false)
 
-  const handleConnect = async () => {
-    setConnectLoading(true)
-    try {
-      setUrl(inputUrl)
-      setToken(inputToken)
-      await connect(inputUrl, inputToken)
-      setModalOpen(false)
-    } catch {
-      // error is handled by the hook
-    } finally {
-      setConnectLoading(false)
+  // Poll Gateway status
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const status = await checkGatewayStatus()
+        setProcessStatus(
+          status.running ? 'running' : 'stopped',
+          status.port,
+          status.pid
+        )
+      } catch {
+        setProcessStatus('unknown')
+      }
     }
-  }
+    checkStatus()
+    const interval = setInterval(checkStatus, 10000) // Check every 10s
+    return () => clearInterval(interval)
+  }, [setProcessStatus])
 
-  const handleDisconnect = () => {
-    disconnect()
-    setModalOpen(false)
-  }
-
-  const sc = statusConfig[status]
+  const statusColor = processStatus === 'running' ? 'green' : processStatus === 'stopped' ? 'default' : 'orange'
+  const statusText = processStatus === 'running' ? `Gateway :${port}` : processStatus === 'stopped' ? 'Gateway stopped' : 'Checking...'
 
   return (
     <Layout style={{ height: '100vh' }}>
       <Sider width={200} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
         <div style={{ padding: '16px', textAlign: 'center' }}>
-          <Title level={4} style={{ margin: 0 }}>{'{'} OpenClaw {'}'}</Title>
+          <Title level={4} style={{ margin: 0 }}>{'{'} OC {'}'}</Title>
         </div>
         <Menu
           mode="inline"
@@ -95,14 +83,10 @@ export default function MainLayout() {
         }}>
           <Title level={5} style={{ margin: 0 }}>OpenClaw Manager</Title>
           <div
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-            onClick={() => {
-              setInputUrl(url)
-              setInputToken(token)
-              setModalOpen(true)
-            }}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setShowInfo(true)}
           >
-            <Badge color={sc.color} text={<Text style={{ fontSize: 12 }}>{sc.text}</Text>} />
+            <Badge color={statusColor} text={<Text style={{ fontSize: 12 }}>{statusText}</Text>} />
           </div>
         </Header>
         <Content style={{ padding: 24, overflow: 'auto', background: '#fafafa' }}>
@@ -111,49 +95,21 @@ export default function MainLayout() {
       </Layout>
 
       <Modal
-        title="Gateway Connection"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        title="System Status"
+        open={showInfo}
+        onCancel={() => setShowInfo(false)}
         footer={null}
-        width={480}
       >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <Text type="secondary">WebSocket URL</Text>
-            <Input
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="ws://127.0.0.1:18789"
-            />
+        <div style={{ lineHeight: 2 }}>
+          <div>Gateway Status: <Tag color={statusColor}>{processStatus}</Tag></div>
+          <div>Port: {port}</div>
+          {pid && <div>PID: {pid}</div>}
+          <div style={{ marginTop: 12 }}>
+            <Text type="secondary">
+              OpenClaw Manager checks Gateway status every 10 seconds via system process detection.
+            </Text>
           </div>
-          <div>
-            <Text type="secondary">Gateway Token</Text>
-            <Input.Password
-              value={inputToken}
-              onChange={(e) => setInputToken(e.target.value)}
-              placeholder="Token from openclaw.json"
-            />
-          </div>
-
-          {error && <Alert type="error" message={error} showIcon />}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            {status === 'connected' && (
-              <Button icon={<DisconnectOutlined />} onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-            )}
-            <Button
-              type="primary"
-              icon={<LinkOutlined />}
-              loading={connectLoading}
-              onClick={handleConnect}
-              disabled={!inputUrl || !inputToken}
-            >
-              {status === 'connected' ? 'Reconnect' : 'Connect'}
-            </Button>
-          </div>
-        </Space>
+        </div>
       </Modal>
     </Layout>
   )
