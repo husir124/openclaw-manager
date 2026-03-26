@@ -1,5 +1,5 @@
 // Gateway WebSocket 服务（单例模式）
-// 心跳保活 + 并发控制 + 自动重连
+// 不主动断开连接，靠 WebSocket 底层检测死连接
 
 interface PendingRequest {
   resolve: (value: unknown) => void
@@ -16,11 +16,6 @@ interface QueuedRequest {
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
-export interface GatewayEvent {
-  method: string
-  params?: unknown
-}
-
 export class GatewayService {
   private static instance: GatewayService | null = null
 
@@ -28,23 +23,18 @@ export class GatewayService {
   private pendingRequests = new Map<string, PendingRequest>()
   private eventHandlers = new Map<string, Set<Function>>()
 
-  // 心跳
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  private heartbeatInterval = 30_000
-  private missedHeartbeats = 0
-  private maxMissedHeartbeats = 2
-
-  // 重连
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-
   // 请求控制
   private requestTimeout = 10_000
   private maxConcurrent = 10
   private activeRequests = 0
   private requestQueue: QueuedRequest[] = []
   private maxMessageSize = 1024 * 1024
+
+  // 重连
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private shouldReconnect = true
 
   // 状态
   private _status: ConnectionStatus = 'disconnected'
@@ -70,8 +60,10 @@ export class GatewayService {
   }
 
   private setStatus(status: ConnectionStatus): void {
-    this._status = status
-    this.statusListeners.forEach((listener) => listener(status))
+    if (this._status !== status) {
+      this._status = status
+      this.statusListeners.forEach((listener) => listener(status))
+    }
   }
 
   onStatusChange(listener: (status: ConnectionStatus) => void): () => void {
@@ -88,6 +80,7 @@ export class GatewayService {
     this._url = url
     this._token = token
     this.reconnectAttempts = 0
+    this.shouldReconnect = true
     return this.doConnect()
   }
 
@@ -100,14 +93,16 @@ export class GatewayService {
         this.ws = new WebSocket(this._url)
       } catch (e) {
         this.setStatus('disconnected')
-        reject(new Error(`Invalid WebSocket URL: ${this._url}`))
+        reject(new Error('Invalid WebSocket URL'))
         return
       }
 
       const connectTimeout = setTimeout(() => {
-        this.ws?.close()
-        this.setStatus('disconnected')
-        reject(new Error('Connection timeout'))
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          this.ws?.close()
+          this.setStatus('disconnected')
+          reject(new Error('Connection timeout'))
+        }
       }, 5000)
 
       this.ws.onopen = () => {
@@ -121,35 +116,35 @@ export class GatewayService {
         }))
         this.setStatus('connected')
         this.reconnectAttempts = 0
-        this.startHeartbeat()
         resolve()
       }
 
       this.ws.onmessage = (event) => {
-        this.missedHeartbeats = 0
         this.handleMessage(event.data as string)
       }
 
       this.ws.onerror = () => {
         clearTimeout(connectTimeout)
-        this.setStatus('disconnected')
-        reject(new Error('WebSocket connection error'))
+        // Don't reject here - onclose will handle it
       }
 
       this.ws.onclose = () => {
         clearTimeout(connectTimeout)
-        this.stopHeartbeat()
         this.ws = null
-        if (this._status === 'connected') {
+        this.rejectAllPending()
+
+        if (this.shouldReconnect && this._status === 'connected') {
           this.tryReconnect()
+        } else if (this._status !== 'reconnecting') {
+          this.setStatus('disconnected')
         }
       }
     })
   }
 
-  // 重连
+  // 重连（指数退避）
   private tryReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts || !this.shouldReconnect) {
       this.setStatus('disconnected')
       return
     }
@@ -163,28 +158,6 @@ export class GatewayService {
         this.tryReconnect()
       })
     }, delay)
-  }
-
-  // 心跳
-  private startHeartbeat(): void {
-    this.missedHeartbeats = 0
-    this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        if (this.missedHeartbeats >= this.maxMissedHeartbeats) {
-          this.ws.close()
-          return
-        }
-        this.missedHeartbeats++
-        this.ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'ping' }))
-      }
-    }, this.heartbeatInterval)
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer)
-      this.heartbeatTimer = null
-    }
   }
 
   // RPC 调用
@@ -243,6 +216,17 @@ export class GatewayService {
     }
   }
 
+  private rejectAllPending(): void {
+    this.pendingRequests.forEach((p) => {
+      clearTimeout(p.timer)
+      p.reject(new Error('Connection lost'))
+    })
+    this.pendingRequests.clear()
+    this.requestQueue.forEach((req) => req.reject(new Error('Connection lost')))
+    this.requestQueue = []
+    this.activeRequests = 0
+  }
+
   // 消息处理
   private handleMessage(data: string): void {
     try {
@@ -284,28 +268,21 @@ export class GatewayService {
     return () => { this.eventHandlers.get(event)?.delete(handler) }
   }
 
-  // 断开
+  // 断开（用户主动断开，不触发重连）
   disconnect(): void {
+    this.shouldReconnect = false
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
-    this.reconnectAttempts = this.maxReconnectAttempts // Prevent auto-reconnect
     this.cleanup()
     this.setStatus('disconnected')
   }
 
   private cleanup(): void {
-    this.stopHeartbeat()
     this.ws?.close()
     this.ws = null
-    this.pendingRequests.forEach((p) => {
-      clearTimeout(p.timer)
-      p.reject(new Error('Disconnected'))
-    })
-    this.pendingRequests.clear()
-    this.requestQueue = []
-    this.activeRequests = 0
+    this.rejectAllPending()
   }
 }
 
