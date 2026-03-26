@@ -12,6 +12,7 @@ pub struct AppError {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)] // 部分 ErrorCode 预留供后续模块使用
 pub enum ErrorCode {
     NodeNotFound,
     NodeVersionTooLow,

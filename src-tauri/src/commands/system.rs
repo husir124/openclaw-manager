@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::error::{AppError, ErrorCode};
+use crate::error::AppError;
 use crate::platform;
 
 #[derive(Debug, Serialize, Deserialize)]

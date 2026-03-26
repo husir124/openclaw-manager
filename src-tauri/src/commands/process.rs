@@ -19,6 +19,7 @@ pub async fn start_gateway() -> Result<String, AppError> {
     }
 
     // 启动 Gateway（后台运行）
+    let binary = platform::openclaw_binary_name();
     let mut cmd = std::process::Command::new(binary);
     cmd.arg("gateway");
 
@@ -50,8 +51,6 @@ pub async fn start_gateway() -> Result<String, AppError> {
 
 #[tauri::command]
 pub async fn stop_gateway() -> Result<String, AppError> {
-    let binary = platform::openclaw_binary_name();
-
     // 检查是否在运行
     let status = super::system::check_gateway_status().await?;
     if !status.running {
