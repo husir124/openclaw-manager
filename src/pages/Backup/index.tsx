@@ -99,26 +99,14 @@ export default function BackupPage() {
   const loadBackups = async () => {
     setLoading(true)
     try {
-      // Simulated backup list - in real use, this calls a Tauri command
-      const mockBackups: BackupFile[] = [
-        {
-          name: 'openclaw-backup-2026-03-26-230000.ocbak',
-          path: 'C:\\Users\\lhu56\\.openclaw\\backups\\openclaw-backup-2026-03-26-230000.ocbak',
-          size: 2048576,
-          created_at: '2026-03-26 23:00:00',
-          encrypted: true,
-        },
-        {
-          name: 'openclaw-backup-2026-03-25-200000.ocbak',
-          path: 'C:\\Users\\lhu56\\.openclaw\\backups\\openclaw-backup-2026-03-25-200000.ocbak',
-          size: 1843200,
-          created_at: '2026-03-25 20:00:00',
-          encrypted: true,
-        },
-      ]
-      setBackups(mockBackups)
+      // 使用 Tauri 命令获取真实备份列表
+      const { listBackups } = await import('../../services/tauri')
+      const backups = await listBackups()
+      setBackups(backups)
     } catch (err) {
       console.error('Failed to load backups:', err)
+      // 如果 Tauri 命令失败，显示空列表
+      setBackups([])
     } finally {
       setLoading(false)
     }
@@ -149,12 +137,30 @@ export default function BackupPage() {
     setShowCreateModal(false)
 
     try {
-      // Simulated backup creation with progress
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 300))
-        setProgress(i)
-      }
+      // 使用 Tauri 命令创建备份
+      const { createBackup, getBackupProgress } = await import('../../services/tauri')
+
+      // 启动备份
+      const backupPromise = createBackup(backupPassword)
+
+      // 轮询进度
+      const progressInterval = setInterval(async () => {
+        try {
+          const p = await getBackupProgress()
+          setProgress(p)
+        } catch {
+          // 忽略进度查询错误
+        }
+      }, 500)
+
+      // 等待备份完成
+      await backupPromise
+
+      clearInterval(progressInterval)
+      setProgress(100)
       setProgressStatus('success')
+
+      // 刷新备份列表
       await loadBackups()
     } catch (err) {
       console.error('Backup creation failed:', err)
@@ -171,14 +177,14 @@ export default function BackupPage() {
     setShowRestoreModal(null)
 
     try {
-      // Simulated restore - in real use:
-      // 1. Stop Gateway
-      // 2. Restore files
-      // 3. Restart Gateway
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      alert('恢复完成！Gateway 已重启。')
+      // 使用 Tauri 命令恢复备份
+      const { restoreBackup } = await import('../../services/tauri')
+      const result = await restoreBackup(showRestoreModal.path, restorePassword)
+      setSuccess(result)
+      await loadBackups()
     } catch (err) {
       console.error('Restore failed:', err)
+      setError(err instanceof Error ? err.message : '恢复失败')
     } finally {
       setRestoringBackup(null)
       setRestorePassword('')

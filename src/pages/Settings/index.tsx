@@ -1,28 +1,23 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Switch, Select, Input, Alert, Divider, Tooltip, Modal } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Switch, Select, Input, Alert, Divider, Tooltip } from 'antd'
 import {
   SettingOutlined,
   ReloadOutlined,
   SaveOutlined,
   QuestionCircleOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   LockOutlined,
   GlobalOutlined,
   CloudServerOutlined,
   InfoCircleOutlined,
-  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { readConfig, writeConfig, startGateway, stopGateway, checkGatewayStatus } from '../../services/tauri'
 
-const { Title, Text, Paragraph, Link } = Typography
-const { Password } = Input
+const { Title, Text, Link } = Typography
 
 // 应用设置
 interface AppSettings {
   // Gateway
   gatewayPort: number
-  gatewayAutoStart: boolean
   gatewayTailscaleMode: 'off' | 'serve' | 'funnel'
 
   // 安全
@@ -38,6 +33,41 @@ interface AppSettings {
   autoUpdateEnabled: boolean
 }
 
+// 主题切换函数
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement
+  let isDark = false
+
+  if (theme === 'system') {
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  } else {
+    isDark = theme === 'dark'
+  }
+
+  root.setAttribute('data-theme', isDark ? 'dark' : 'light')
+  document.body.style.background = isDark ? '#141414' : '#fafafa'
+  document.body.style.color = isDark ? '#fff' : '#000'
+
+  if (isDark) {
+    document.body.classList.add('dark')
+    document.body.classList.remove('light')
+  } else {
+    document.body.classList.add('light')
+    document.body.classList.remove('dark')
+  }
+
+  localStorage.setItem('ocm-theme', theme)
+
+  // 触发自定义事件，让 main.tsx 的 ConfigProvider 响应
+  window.dispatchEvent(new Event('theme-change'))
+}
+
+// 语言切换函数
+function applyLanguage(language: 'zh' | 'en') {
+  localStorage.setItem('ocm-language', language)
+  // 注意：完整的 i18n 需要额外的库，这里先存储偏好
+}
+
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -47,7 +77,6 @@ export default function SettingsPage() {
   // 设置状态
   const [settings, setSettings] = useState<AppSettings>({
     gatewayPort: 18789,
-    gatewayAutoStart: true,
     gatewayTailscaleMode: 'off',
     dmPolicy: 'pairing',
     gatewayAuthMode: 'token',
@@ -63,7 +92,7 @@ export default function SettingsPage() {
   const [gatewayPid, setGatewayPid] = useState<number | null>(null)
 
   // 版本信息
-  const [appVersion, setAppVersion] = useState('0.1.0')
+  const [appVersion] = useState('0.1.0')
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null)
 
   const loadSettings = async () => {
@@ -85,17 +114,25 @@ export default function SettingsPage() {
       // 读取 meta
       const metaConfig = (parsed.meta as Record<string, unknown>) || {}
 
+      // 从 localStorage 读取 UI 设置
+      const savedTheme = (localStorage.getItem('ocm-theme') || 'system') as AppSettings['theme']
+      const savedLanguage = (localStorage.getItem('ocm-language') || 'zh') as AppSettings['language']
+      const savedTelemetry = localStorage.getItem('ocm-telemetry') === 'true'
+      const savedAutoUpdate = localStorage.getItem('ocm-auto-update') !== 'false' // 默认 true
+
       setSettings({
         gatewayPort: (gatewayConfig.port as number) || 18789,
-        gatewayAutoStart: true,
-        gatewayTailscaleMode: (tailscaleConfig.mode as string) || 'off' as AppSettings['gatewayTailscaleMode'],
-        dmPolicy: (telegramConfig.dmPolicy as string) || 'pairing' as AppSettings['dmPolicy'],
-        gatewayAuthMode: (authConfig.mode as string) || 'token' as AppSettings['gatewayAuthMode'],
-        theme: 'system',
-        language: 'zh',
-        telemetryEnabled: false,
-        autoUpdateEnabled: true,
+        gatewayTailscaleMode: ((tailscaleConfig.mode as string) || 'off') as AppSettings['gatewayTailscaleMode'],
+        dmPolicy: ((telegramConfig.dmPolicy as string) || 'pairing') as AppSettings['dmPolicy'],
+        gatewayAuthMode: ((authConfig.mode as string) || 'token') as AppSettings['gatewayAuthMode'],
+        theme: savedTheme,
+        language: savedLanguage,
+        telemetryEnabled: savedTelemetry,
+        autoUpdateEnabled: savedAutoUpdate,
       })
+
+      // 应用已保存的主题
+      applyTheme(savedTheme)
 
       // 获取 Gateway 状态
       const gwStatus = await checkGatewayStatus()
@@ -122,7 +159,7 @@ export default function SettingsPage() {
       const config = await readConfig()
       const parsed = config.parsed as Record<string, unknown>
 
-      // 更新 Gateway 配置
+      // 1. 更新 Gateway 配置
       const gatewayConfig = (parsed.gateway as Record<string, unknown>) || {}
       gatewayConfig.port = settings.gatewayPort
 
@@ -136,14 +173,28 @@ export default function SettingsPage() {
 
       parsed.gateway = gatewayConfig
 
-      // 更新 channels 配置
+      // 2. 更新 channels 配置
       const channelsConfig = (parsed.channels as Record<string, unknown>) || {}
       const telegramConfig = (channelsConfig.telegram as Record<string, unknown>) || {}
       telegramConfig.dmPolicy = settings.dmPolicy
       channelsConfig.telegram = telegramConfig
       parsed.channels = channelsConfig
 
+      // 3. 写入配置文件
       await writeConfig(JSON.stringify(parsed, null, 2))
+
+      // 4. 保存 UI 设置到 localStorage
+      localStorage.setItem('ocm-theme', settings.theme)
+      localStorage.setItem('ocm-language', settings.language)
+      localStorage.setItem('ocm-telemetry', String(settings.telemetryEnabled))
+      localStorage.setItem('ocm-auto-update', String(settings.autoUpdateEnabled))
+
+      // 5. 应用主题
+      applyTheme(settings.theme)
+
+      // 6. 应用语言
+      applyLanguage(settings.language)
+
       setSuccess('设置保存成功')
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
@@ -168,6 +219,12 @@ export default function SettingsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     }
+  }
+
+  // 主题变更即时预览
+  const handleThemeChange = (theme: AppSettings['theme']) => {
+    setSettings({ ...settings, theme })
+    applyTheme(theme)
   }
 
   if (loading) {
@@ -336,13 +393,13 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Space>
               <Text>主题</Text>
-              <Tooltip title="light：浅色；dark：深色；system：跟随系统">
+              <Tooltip title="切换后即时预览，保存后持久化">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>
             <Select
               value={settings.theme}
-              onChange={(v) => setSettings({ ...settings, theme: v })}
+              onChange={handleThemeChange}
               options={[
                 { label: '浅色', value: 'light' },
                 { label: '深色', value: 'dark' },
@@ -355,7 +412,7 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Space>
               <Text>语言</Text>
-              <Tooltip title="界面显示语言">
+              <Tooltip title="界面显示语言（保存后生效）">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>

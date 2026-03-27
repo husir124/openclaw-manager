@@ -125,18 +125,32 @@ export default function HealthPage() {
   }
 
   const loadLogs = async () => {
-    // Simulated log loading - in real use, this calls a Tauri command
     try {
-      const mockLogs: LogLine[] = [
-        { time: '07:30:01', level: 'info', message: 'Gateway started on port 18789' },
-        { time: '07:30:02', level: 'info', message: 'WebSocket server listening' },
-        { time: '07:31:15', level: 'info', message: 'Agent "main" connected' },
-        { time: '07:32:00', level: 'warn', message: 'Session timeout for idle connection' },
-        { time: '07:33:45', level: 'info', message: 'New message received from webchat' },
-      ]
-      setLogs(mockLogs.slice(0, logLines))
+      // 尝试使用 Tauri 命令获取真实日志
+      const { getLogs } = await import('../../services/tauri')
+      const logContent = await getLogs(logLines)
+
+      if (logContent && logContent !== '暂无日志') {
+        // 解析日志内容
+        const lines = logContent.split('\n').filter(line => line.trim())
+        const parsedLogs: LogLine[] = lines.map(line => {
+          // 尝试解析日志格式：时间 [级别] 消息
+          const match = line.match(/(\d{2}:\d{2}:\d{2})\s+\[(\w+)\]\s+(.*)/)
+          if (match) {
+            return { time: match[1], level: match[2].toLowerCase() as LogLine['level'], message: match[3] }
+          }
+          // 如果格式不匹配，使用整行作为消息
+          return { time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), level: 'info' as LogLine['level'], message: line }
+        })
+        setLogs(parsedLogs.slice(0, logLines))
+      } else {
+        // 没有日志文件
+        setLogs([])
+      }
     } catch (err) {
       console.error('Failed to load logs:', err)
+      // 如果 Tauri 命令失败，显示空状态
+      setLogs([])
     }
   }
 
