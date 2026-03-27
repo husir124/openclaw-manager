@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import enUS from 'antd/locale/en_US'
+import { I18nProvider } from './contexts/I18nContext'
+import { getCurrentLanguage, Language } from './i18n'
 import App from './App'
 import './index.css'
 
@@ -14,6 +17,8 @@ function Root() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches
   })
 
+  const [language, setLanguageState] = useState<Language>(getCurrentLanguage)
+
   useEffect(() => {
     // 监听 localStorage 变化
     const handleStorage = () => {
@@ -21,6 +26,8 @@ function Root() {
       if (saved === 'dark') setIsDark(true)
       else if (saved === 'light') setIsDark(false)
       else setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
+
+      setLanguageState(getCurrentLanguage())
     }
 
     // 监听系统主题变化
@@ -35,13 +42,15 @@ function Root() {
     window.addEventListener('storage', handleStorage)
     mediaQuery.addEventListener('change', handleChange)
 
-    // 监听自定义事件（同一页面的主题切换）
+    // 监听自定义事件（同一页面的主题/语言切换）
     window.addEventListener('theme-change', handleStorage)
+    window.addEventListener('language-change', handleStorage)
 
     return () => {
       window.removeEventListener('storage', handleStorage)
       mediaQuery.removeEventListener('change', handleChange)
       window.removeEventListener('theme-change', handleStorage)
+      window.removeEventListener('language-change', handleStorage)
     }
   }, [])
 
@@ -49,12 +58,14 @@ function Root() {
     <React.StrictMode>
       <BrowserRouter>
         <ConfigProvider
-          locale={zhCN}
+          locale={language === 'en' ? enUS : zhCN}
           theme={{
             algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
           }}
         >
-          <App />
+          <I18nProvider>
+            <App />
+          </I18nProvider>
         </ConfigProvider>
       </BrowserRouter>
     </React.StrictMode>
