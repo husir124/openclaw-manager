@@ -1,5 +1,7 @@
+import { useState, useCallback } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { OnboardingGuide } from './components/OnboardingGuide'
 import MainLayout from './layouts/MainLayout'
 import SetupPage from './pages/Setup'
 import DashboardPage from './pages/Dashboard'
@@ -14,8 +16,19 @@ import ConfigPage from './pages/Config'
 import SettingsPage from './pages/Settings'
 
 export default function App() {
+  const [onboardingComplete, setOnboardingComplete] = useState(() => {
+    return localStorage.getItem('ocm-onboarding-completed') === 'true'
+  })
+
+  const handleOnboardingComplete = useCallback(() => {
+    setOnboardingComplete(true)
+  }, [])
+
   return (
     <ErrorBoundary>
+      {!onboardingComplete && (
+        <OnboardingGuide onComplete={handleOnboardingComplete} />
+      )}
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
