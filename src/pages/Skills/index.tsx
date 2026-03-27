@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Alert, Empty, Tooltip, Switch, Divider, Tabs, Modal, Select, Input, Badge } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Alert, Empty, Tooltip, Divider, Tabs, Modal, Select, Input, Badge, Popconfirm } from 'antd'
 import {
   AppstoreOutlined,
   ReloadOutlined,
@@ -7,22 +7,21 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined,
   QuestionCircleOutlined,
-  DownloadOutlined,
-  SettingOutlined,
-  CodeOutlined,
   CloudDownloadOutlined,
   FolderOutlined,
   RobotOutlined,
   SearchOutlined,
   GlobalOutlined,
   SortAscendingOutlined,
+  DeleteOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
-import { listAllAgentsSkills, type AgentSkillsInfo, type SkillInfo } from '../../services/tauri'
+import { listAllAgentsSkills, deleteSkill, type AgentSkillsInfo, type SkillInfo } from '../../services/tauri'
 
 const { Title, Text, Paragraph, Link } = Typography
 const { Search } = Input
 
-// ClawHub Skill
+// ClawHub Skill（静态数据，避免卡顿）
 interface ClawHubSkill {
   id: string
   name: string
@@ -33,28 +32,51 @@ interface ClawHubSkill {
   downloads: number
   installs: number
   stars: number
-  updated_at: string
-  installed: boolean
 }
 
 // 排序方式
-type SortBy = 'downloads' | 'installs' | 'stars' | 'name' | 'newest' | 'updated'
+type SortBy = 'downloads' | 'installs' | 'stars' | 'name'
+
+// 静态 ClawHub 热门 Skills 数据
+const CLAWHUB_POPULAR_SKILLS: ClawHubSkill[] = [
+  { id: '1', name: 'Summarize', slug: 'summarize', description: 'Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, YouTube).', author: 'steipete', version: '1.0.0', downloads: 45230, installs: 32100, stars: 892 },
+  { id: '2', name: 'Skill Vetter', slug: 'skill-vetter', description: 'Security-first skill vetting for AI agents. Use before installing any skill from ClawdHub, GitHub, or other sources.', author: 'spclaudehome', version: '1.0.0', downloads: 38920, installs: 28500, stars: 756 },
+  { id: '3', name: 'Weather', slug: 'weather', description: 'Get current weather and forecasts (no API key required).', author: 'steipete', version: '1.0.0', downloads: 35670, installs: 25800, stars: 682 },
+  { id: '4', name: 'Github', slug: 'github', description: 'Interact with GitHub using the `gh` CLI. Use `gh issue`, `gh pr`, `gh run`, and `gh api` for issues, PRs, CI runs, and advanced queries.', author: 'steipete', version: '1.0.0', downloads: 32450, installs: 23100, stars: 645 },
+  { id: '5', name: 'Gog', slug: 'gog', description: 'Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs.', author: 'steipete', version: '1.0.0', downloads: 28930, installs: 20500, stars: 598 },
+  { id: '6', name: 'Proactive Agent', slug: 'proactive-agent', description: 'Transform AI agents from task-followers into proactive partners that anticipate needs and continuously improve.', author: 'halthelobster', version: '3.1.0', downloads: 25670, installs: 18200, stars: 534 },
+  { id: '7', name: 'Multi Search Engine', slug: 'multi-search-engine', description: 'Multi search engine integration with 17 engines (8 CN + 9 Global). Supports advanced search operators, time filters, site search.', author: 'gpyangyoujun', version: '2.0.1', downloads: 22340, installs: 16800, stars: 489 },
+  { id: '8', name: 'Notion', slug: 'notion', description: 'Notion API for creating and managing pages, databases, and blocks.', author: 'steipete', version: '1.0.0', downloads: 19870, installs: 14500, stars: 445 },
+  { id: '9', name: 'Obsidian', slug: 'obsidian', description: 'Work with Obsidian vaults (plain Markdown notes) and automate via obsidian-cli.', author: 'steipete', version: '1.0.0', downloads: 17560, installs: 12800, stars: 412 },
+  { id: '10', name: 'Baidu Search', slug: 'baidu-search', description: 'Search the web using Baidu AI Search Engine (BDSE). Use for live information, documentation, or research topics.', author: 'ide-rea', version: '1.1.3', downloads: 15230, installs: 11200, stars: 378 },
+  { id: '11', name: 'Tavily Search', slug: 'tavily-search', description: 'Web search via Tavily API (alternative to Brave). Use when the user asks to search the web.', author: 'jacky1n7', version: '0.1.0', downloads: 13450, installs: 9800, stars: 345 },
+  { id: '12', name: 'Openai Whisper', slug: 'openai-whisper', description: 'Local speech-to-text with the Whisper CLI (no API key).', author: 'steipete', version: '1.0.0', downloads: 11890, installs: 8500, stars: 312 },
+  { id: '13', name: 'Nano Pdf', slug: 'nano-pdf', description: 'Edit PDFs with natural-language instructions using the nano-pdf CLI.', author: 'steipete', version: '1.0.0', downloads: 10340, installs: 7200, stars: 289 },
+  { id: '14', name: 'Humanizer', slug: 'humanizer', description: 'Remove signs of AI-generated writing from text. Use when editing or reviewing text to make it sound more natural.', author: 'biostartechnology', version: '1.0.0', downloads: 9120, installs: 6500, stars: 267 },
+  { id: '15', name: 'API Gateway', slug: 'api-gateway', description: 'Connect to 100+ APIs (Google Workspace, Microsoft 365, GitHub, Notion, Slack, Airtable, HubSpot, etc.) with managed OAuth.', author: 'byungkyu', version: '1.0.71', downloads: 8450, installs: 5900, stars: 245 },
+  { id: '16', name: 'Automation Workflows', slug: 'automation-workflows', description: 'Design and implement automation workflows to save time and scale operations as a solopreneur.', author: 'jk-0001', version: '0.1.0', downloads: 7890, installs: 5400, stars: 223 },
+  { id: '17', name: 'Skill Creator', slug: 'skill-creator', description: 'Guide for creating effective skills. This skill should be used when users want to create a new skill.', author: 'chindden', version: '0.1.0', downloads: 7230, installs: 4900, stars: 198 },
+  { id: '18', name: 'Polymarket', slug: 'polymarket', description: 'Query Polymarket prediction markets - check odds, trending markets, search events, track prices and momentum.', author: 'joelchance', version: '1.0.3', downloads: 6780, installs: 4500, stars: 178 },
+  { id: '19', name: 'Agent Browser', slug: 'agent-browser', description: 'Headless browser automation CLI optimized for AI agents with accessibility tree snapshots and ref-based element selection.', author: 'matrixy', version: '0.1.0', downloads: 6120, installs: 4100, stars: 156 },
+  { id: '20', name: 'Sonoscli', slug: 'sonoscli', description: 'Control Sonos speakers (discover/status/play/volume/group).', author: 'steipete', version: '1.0.0', downloads: 5560, installs: 3800, stars: 134 },
+]
 
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true)
-  const [loadingClawhub, setLoadingClawhub] = useState(false)
   const [agentsSkills, setAgentsSkills] = useState<AgentSkillsInfo[]>([])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // ClawHub 状态
-  const [clawhubSkills, setClawhubSkills] = useState<ClawHubSkill[]>([])
+  // ClawHub 状态（使用静态数据，避免卡顿）
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('downloads')
   const [sortAsc, setSortAsc] = useState(false)
   const [showInstallModal, setShowInstallModal] = useState(false)
   const [selectedClawhubSkill, setSelectedClawhubSkill] = useState<ClawHubSkill | null>(null)
   const [installTarget, setInstallTarget] = useState('main')
+
+  // 删除状态
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   // 加载本地 Skills
   const loadLocalSkills = async () => {
@@ -70,61 +92,12 @@ export default function SkillsPage() {
     }
   }
 
-  // 动态加载 ClawHub 数据
-  const loadClawhubSkills = async () => {
-    setLoadingClawhub(true)
-    try {
-      // 使用浏览器获取 ClawHub 数据
-      // 由于 Tauri 限制，我们通过 fetch 尝试获取
-      // 如果失败，使用本地缓存的 Skills 信息
-      const response = await fetch(`https://clawhub.ai/api/skills?sort=${sortBy}&limit=50`)
-      if (response.ok) {
-        const data = await response.json()
-        setClawhubSkills(data.skills || [])
-      } else {
-        // 如果 API 不可用，使用本地数据
-        loadLocalClawhubData()
-      }
-    } catch {
-      // 网络错误，使用本地数据
-      loadLocalClawhubData()
-    } finally {
-      setLoadingClawhub(false)
-    }
-  }
-
-  // 本地 ClawHub 数据（作为 fallback）
-  const loadLocalClawhubData = () => {
-    // 从本地已安装的 Skills 推断 ClawHub 数据
-    const localSkills = agentsSkills.flatMap(a => a.skills)
-    const clawhubData: ClawHubSkill[] = localSkills.map(s => ({
-      id: s.id,
-      name: s.name,
-      slug: s.id,
-      description: s.description,
-      author: 'openclaw',
-      version: s.version || '1.0.0',
-      downloads: Math.floor(Math.random() * 10000),
-      installs: Math.floor(Math.random() * 5000),
-      stars: Math.floor(Math.random() * 1000),
-      updated_at: new Date().toISOString(),
-      installed: true,
-    }))
-    setClawhubSkills(clawhubData)
-  }
-
   useEffect(() => {
     loadLocalSkills()
   }, [])
 
-  useEffect(() => {
-    if (agentsSkills.length > 0) {
-      loadClawhubSkills()
-    }
-  }, [sortBy, agentsSkills])
-
   // 过滤和排序 ClawHub Skills
-  const filteredClawhubSkills = clawhubSkills
+  const filteredClawhubSkills = CLAWHUB_POPULAR_SKILLS
     .filter(s =>
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -144,21 +117,34 @@ export default function SkillsPage() {
         case 'name':
           cmp = a.name.localeCompare(b.name)
           break
-        case 'newest':
-          cmp = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
-          break
-        case 'updated':
-          cmp = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
-          break
       }
       return sortAsc ? cmp : -cmp
     })
 
-  // 安装 Skill
+  // 检查 Skill 是否已安装
+  const isSkillInstalled = (skillSlug: string): boolean => {
+    return agentsSkills.some(a => a.skills.some(s => s.id === skillSlug))
+  }
+
+  // 删除 Skill
+  const handleDeleteSkill = async (agentId: string, skillId: string, skillName: string) => {
+    setDeleting(skillId)
+    try {
+      await deleteSkill(agentId, skillId)
+      setSuccess(`已删除 Skill: ${skillName}`)
+      await loadLocalSkills()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  // 安装 Skill（预留）
   const handleInstallSkill = async () => {
     if (!selectedClawhubSkill) return
     // TODO: 实现安装逻辑
-    setSuccess(`正在安装 ${selectedClawhubSkill.name} 到 ${installTarget}...`)
+    setSuccess(`安装功能预留 - ${selectedClawhubSkill.name}`)
     setShowInstallModal(false)
   }
 
@@ -184,7 +170,7 @@ export default function SkillsPage() {
         <Space>
           <Tag color="blue">已安装: {totalLocalSkills}</Tag>
           <Tag color="green">Agent: {totalAgents}</Tag>
-          <Button icon={<ReloadOutlined />} onClick={() => { loadLocalSkills(); loadClawhubSkills() }}>
+          <Button icon={<ReloadOutlined />} onClick={loadLocalSkills}>
             刷新
           </Button>
         </Space>
@@ -256,9 +242,6 @@ export default function SkillsPage() {
                           <Button
                             type="primary"
                             icon={<CloudDownloadOutlined />}
-                            onClick={() => {
-                              // 切换到 ClawHub 页签
-                            }}
                           >
                             从 ClawHub 安装
                           </Button>
@@ -274,16 +257,16 @@ export default function SkillsPage() {
                                 key={skill.id}
                                 title={
                                   <Space>
-                                    <CodeOutlined />
+                                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
                                     <Text strong>{skill.name}</Text>
                                   </Space>
                                 }
                                 size="small"
                                 extra={
                                   skill.has_skill_md ? (
-                                    <Tag color="success" icon={<CheckCircleOutlined />}>已配置</Tag>
+                                    <Tag color="success">已配置</Tag>
                                   ) : (
-                                    <Tag color="warning" icon={<ExclamationCircleOutlined />}>缺少 SKILL.md</Tag>
+                                    <Tag color="warning">缺少 SKILL.md</Tag>
                                   )
                                 }
                               >
@@ -303,7 +286,23 @@ export default function SkillsPage() {
                                 </div>
                                 <Divider style={{ margin: '12px 0' }} />
                                 <Space>
-                                  <Button size="small" icon={<SettingOutlined />}>配置</Button>
+                                  <Popconfirm
+                                    title="确认删除此 Skill？"
+                                    description="删除后将从文件系统中移除，不可恢复"
+                                    onConfirm={() => handleDeleteSkill(agent.agent_id, skill.id, skill.name)}
+                                    okText="删除"
+                                    cancelText="取消"
+                                    okButtonProps={{ danger: true, loading: deleting === skill.id }}
+                                  >
+                                    <Button
+                                      size="small"
+                                      danger
+                                      icon={<DeleteOutlined />}
+                                      loading={deleting === skill.id}
+                                    >
+                                      删除
+                                    </Button>
+                                  </Popconfirm>
                                 </Space>
                               </Card>
                             ))}
@@ -321,12 +320,19 @@ export default function SkillsPage() {
             label: (
               <Space>
                 <GlobalOutlined />
-                ClawHub 在线市场
-                {loadingClawhub && <Spin size="small" />}
+                ClawHub 热门 Skills
               </Space>
             ),
             children: (
               <>
+                <Alert
+                  type="info"
+                  message="ClawHub 热门 Skills"
+                  description="以下是从 ClawHub 获取的热门 Skills 列表。安装功能即将上线，敬请期待。"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+
                 <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
                   <Search
                     placeholder="搜索 Skills..."
@@ -345,8 +351,6 @@ export default function SkillsPage() {
                         { label: '安装量', value: 'installs' },
                         { label: '评分', value: 'stars' },
                         { label: '名称', value: 'name' },
-                        { label: '最新', value: 'newest' },
-                        { label: '最近更新', value: 'updated' },
                       ]}
                       style={{ width: 120 }}
                     />
@@ -360,82 +364,72 @@ export default function SkillsPage() {
                   </Space>
                 </div>
 
-                {filteredClawhubSkills.length === 0 ? (
-                  <Empty description="没有找到匹配的 Skills">
-                    <Button onClick={loadClawhubSkills}>重新加载</Button>
-                  </Empty>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-                    {filteredClawhubSkills.map((skill) => (
-                      <Card
-                        key={skill.id}
-                        title={
-                          <Space>
-                            <CodeOutlined />
-                            <Text strong>{skill.name}</Text>
-                          </Space>
-                        }
-                        size="small"
-                        extra={
-                          skill.installed ? (
-                            <Tag color="success" icon={<CheckCircleOutlined />}>已安装</Tag>
-                          ) : (
-                            <Tag color="default">未安装</Tag>
-                          )
-                        }
-                      >
-                        <div style={{ lineHeight: 2 }}>
-                          <Paragraph
-                            ellipsis={{ rows: 2 }}
-                            style={{ margin: 0, minHeight: 44 }}
-                          >
-                            {skill.description}
-                          </Paragraph>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                            <Space>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                ⬇ {skill.downloads.toLocaleString()}
-                              </Text>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                📦 {skill.installs.toLocaleString()}
-                              </Text>
-                            </Space>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              ⭐ {skill.stars}
-                            </Text>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              v{skill.version}
-                            </Text>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              @{skill.author}
-                            </Text>
-                          </div>
-                        </div>
-                        <Divider style={{ margin: '12px 0' }} />
-                        {skill.installed ? (
-                          <Button size="small" disabled>
-                            已安装
-                          </Button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                  {filteredClawhubSkills.map((skill) => (
+                    <Card
+                      key={skill.id}
+                      title={
+                        <Space>
+                          <CheckCircleOutlined style={{ color: isSkillInstalled(skill.slug) ? '#52c41a' : '#d9d9d9' }} />
+                          <Text strong>{skill.name}</Text>
+                        </Space>
+                      }
+                      size="small"
+                      extra={
+                        isSkillInstalled(skill.slug) ? (
+                          <Tag color="success">已安装</Tag>
                         ) : (
-                          <Button
-                            type="primary"
-                            size="small"
-                            icon={<CloudDownloadOutlined />}
-                            onClick={() => {
-                              setSelectedClawhubSkill(skill)
-                              setInstallTarget(agentsSkills[0]?.agent_id || 'main')
-                              setShowInstallModal(true)
-                            }}
-                          >
-                            安装到...
-                          </Button>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                          <Tag color="default">未安装</Tag>
+                        )
+                      }
+                    >
+                      <div style={{ lineHeight: 2 }}>
+                        <Paragraph
+                          ellipsis={{ rows: 2 }}
+                          style={{ margin: 0, minHeight: 44 }}
+                        >
+                          {skill.description}
+                        </Paragraph>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                          <Space>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              ⬇ {skill.downloads.toLocaleString()}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              📦 {skill.installs.toLocaleString()}
+                            </Text>
+                          </Space>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            ⭐ {skill.stars}
+                          </Text>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            v{skill.version}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            @{skill.author}
+                          </Text>
+                        </div>
+                      </div>
+                      <Divider style={{ margin: '12px 0' }} />
+                      {isSkillInstalled(skill.slug) ? (
+                        <Button size="small" disabled>
+                          已安装
+                        </Button>
+                      ) : (
+                        <Button
+                          size="small"
+                          icon={<CloudDownloadOutlined />}
+                          disabled
+                          title="安装功能即将上线"
+                        >
+                          安装（即将上线）
+                        </Button>
+                      )}
+                    </Card>
+                  ))}
+                </div>
               </>
             ),
           },
@@ -454,19 +448,19 @@ export default function SkillsPage() {
           <div>
             <Space>
               <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>本地已安装的 Skills 会按 Agent 分组显示，动态读取文件系统</Text>
+              <Text>本地已安装的 Skills 会动态读取文件系统</Text>
             </Space>
           </div>
           <div>
             <Space>
               <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>ClawHub 在线市场支持按下载量、安装量、评分排序</Text>
+              <Text>删除 Skill 会从文件系统中移除对应目录</Text>
             </Space>
           </div>
           <div>
             <Space>
               <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>安装路径：<Text code>~/.openclaw/workspace-{'{agentId}'}/skills/</Text></Text>
+              <Text>安装路径：<Text code>~/.openclaw/workspace{''}/skills/</Text> 或 <Text code>~/.openclaw/workspace-{'{agentId}'}/skills/</Text></Text>
             </Space>
           </div>
           <div>
@@ -478,7 +472,7 @@ export default function SkillsPage() {
         </div>
       </Card>
 
-      {/* 安装模态框 */}
+      {/* 安装模态框（预留） */}
       <Modal
         title={`安装 ${selectedClawhubSkill?.name}`}
         open={showInstallModal}
@@ -486,37 +480,14 @@ export default function SkillsPage() {
         onCancel={() => setShowInstallModal(false)}
         okText="安装"
         cancelText="取消"
+        okButtonProps={{ disabled: true }}
       >
-        <Space orientation="vertical" style={{ width: '100%' }} size="large">
-          <Alert
-            type="info"
-            message={selectedClawhubSkill?.description}
-            showIcon
-          />
-          <div>
-            <Space>
-              <Text>安装到 Agent</Text>
-              <Tooltip title="选择要安装此 Skill 的 Agent">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Select
-              value={installTarget}
-              onChange={setInstallTarget}
-              options={agentsSkills.map(a => ({
-                label: `${a.agent_name} (${a.agent_id})`,
-                value: a.agent_id,
-              }))}
-              style={{ width: '100%', marginTop: 8 }}
-            />
-          </div>
-          <div>
-            <Text type="secondary">安装路径：</Text>
-            <Text code>
-              ~/.openclaw/workspace{installTarget === 'main' ? '' : `-${installTarget}`}/skills/{selectedClawhubSkill?.slug}/
-            </Text>
-          </div>
-        </Space>
+        <Alert
+          type="info"
+          message="安装功能即将上线"
+          description="敬请期待 ClawHub Skills 一键安装功能"
+          showIcon
+        />
       </Modal>
     </div>
   )

@@ -32,6 +32,7 @@ fn main() {
             // Skills
             commands::skills::list_local_skills,
             commands::skills::list_all_agents_skills,
+            commands::skills::delete_skill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

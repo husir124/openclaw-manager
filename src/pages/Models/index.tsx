@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Divider, Table, Tooltip, Select, message } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Divider, Table, Tooltip, Select, Tabs } from 'antd'
 import {
   CloudServerOutlined,
   PlusOutlined,
@@ -13,6 +13,8 @@ import {
   EyeOutlined,
   ExperimentOutlined,
   KeyOutlined,
+  ApiOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { readConfig, writeConfig } from '../../services/tauri'
 
@@ -27,6 +29,13 @@ interface Provider {
   apiKey: string
   api: string
   models: Model[]
+  input?: string[]
+  cost?: {
+    input: number
+    output: number
+    cacheRead: number
+    cacheWrite: number
+  }
 }
 
 interface Model {
@@ -35,6 +44,13 @@ interface Model {
   reasoning: boolean
   contextWindow: number
   maxTokens: number
+  input?: string[]
+  cost?: {
+    input: number
+    output: number
+    cacheRead: number
+    cacheWrite: number
+  }
 }
 
 // 模型别名
@@ -43,10 +59,27 @@ interface ModelAlias {
   alias: string
 }
 
+// Auth Profile
+interface AuthProfile {
+  provider: string
+  mode: string
+}
+
+// 全局模型配置
+interface GlobalModelConfig {
+  mode: string
+  workspace: string
+  compaction: { mode: string }
+  maxConcurrent: number
+  subagents: { maxConcurrent: number }
+}
+
 export default function ModelsPage() {
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState<Provider[]>([])
   const [modelAliases, setModelAliases] = useState<ModelAlias[]>([])
+  const [authProfiles, setAuthProfiles] = useState<Record<string, AuthProfile>>({})
+  const [globalConfig, setGlobalConfig] = useState<GlobalModelConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -81,6 +114,8 @@ export default function ModelsPage() {
       const modelsConfig = (parsed.models as Record<string, unknown>) || {}
       const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
       const aliasesConfig = (modelsConfig.models as Record<string, unknown>) || {}
+      const authConfig = (parsed.auth as Record<string, unknown>) || {}
+      const authProfilesConfig = (authConfig.profiles as Record<string, unknown>) || {}
 
       // 解析 providers
       const providerList: Provider[] = Object.entries(providersConfig).map(([id, config]) => {
@@ -98,6 +133,8 @@ export default function ModelsPage() {
             reasoning: (m.reasoning as boolean) || false,
             contextWindow: (m.contextWindow as number) || 128000,
             maxTokens: (m.maxTokens as number) || 4096,
+            input: m.input as string[],
+            cost: m.cost as Model['cost'],
           })),
         }
       })
@@ -111,8 +148,29 @@ export default function ModelsPage() {
         }
       })
 
+      // 解析 auth profiles
+      const profiles: Record<string, AuthProfile> = {}
+      for (const [key, value] of Object.entries(authProfilesConfig)) {
+        const v = value as Record<string, unknown>
+        profiles[key] = {
+          provider: v.provider as string,
+          mode: v.mode as string,
+        }
+      }
+
+      // 解析全局配置
+      const global: GlobalModelConfig = {
+        mode: (modelsConfig.mode as string) || 'merge',
+        workspace: (modelsConfig.workspace as string) || '',
+        compaction: (modelsConfig.compaction as Record<string, unknown>) as GlobalModelConfig['compaction'] || { mode: 'safeguard' },
+        maxConcurrent: (modelsConfig.maxConcurrent as number) || 4,
+        subagents: (modelsConfig.subagents as Record<string, unknown>) as GlobalModelConfig['subagents'] || { maxConcurrent: 8 },
+      }
+
       setProviders(providerList)
       setModelAliases(aliasList)
+      setAuthProfiles(profiles)
+      setGlobalConfig(global)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载配置失败')
     } finally {
@@ -151,7 +209,6 @@ export default function ModelsPage() {
       const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
 
       if (editingProvider) {
-        // 编辑现有 Provider
         const existing = providersConfig[editingProvider.id] as Record<string, unknown>
         providersConfig[formProviderId] = {
           ...existing,
@@ -160,12 +217,10 @@ export default function ModelsPage() {
           api: formApi,
           name: formProviderName || formProviderId,
         }
-        // 如果 ID 变了，删除旧的
         if (formProviderId !== editingProvider.id) {
           delete providersConfig[editingProvider.id]
         }
       } else {
-        // 添加新 Provider
         if (providersConfig[formProviderId]) {
           setError(`Provider "${formProviderId}" 已存在`)
           return
@@ -263,7 +318,6 @@ export default function ModelsPage() {
   const handleTestProvider = async (provider: Provider) => {
     setTestingProvider(provider.id)
     try {
-      // 简单测试：发送一个请求到 API
       const response = await fetch(`${provider.baseUrl}/models`, {
         method: 'GET',
         headers: {
@@ -304,7 +358,6 @@ export default function ModelsPage() {
         <Space>
           <CloudServerOutlined />
           <Text strong>{name}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>({record.id})</Text>
         </Space>
       ),
     },
@@ -313,8 +366,16 @@ export default function ModelsPage() {
       dataIndex: 'baseUrl',
       key: 'baseUrl',
       render: (url: string) => (
-        <Text code style={{ fontSize: 12 }}>{url}</Text>
+        <Text code style={{ fontSize: 12, maxWidth: 200, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {url}
+        </Text>
       ),
+    },
+    {
+      title: 'API 类型',
+      dataIndex: 'api',
+      key: 'api',
+      render: (api: string) => <Tag>{api}</Tag>,
     },
     {
       title: 'API Key',
@@ -328,7 +389,7 @@ export default function ModelsPage() {
       ),
     },
     {
-      title: '模型数量',
+      title: '模型',
       key: 'modelCount',
       render: (_: unknown, record: Provider) => (
         <Tag color="blue">{record.models.length} 个模型</Tag>
@@ -378,13 +439,20 @@ export default function ModelsPage() {
     )
   }
 
+  // 统计信息
+  const totalModels = providers.reduce((sum, p) => sum + p.models.length, 0)
+  const totalAliases = modelAliases.length
+
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>
           <CloudServerOutlined /> 模型配置
         </Title>
         <Space>
+          <Tag color="blue">Providers: {providers.length}</Tag>
+          <Tag color="green">模型: {totalModels}</Tag>
+          <Tag color="orange">别名: {totalAliases}</Tag>
           <Button icon={<ReloadOutlined />} onClick={loadConfig}>刷新</Button>
           <Button
             type="primary"
@@ -399,44 +467,150 @@ export default function ModelsPage() {
       {error && <Alert type="error" message={error} showIcon closable style={{ marginBottom: 16 }} />}
       {success && <Alert type="success" message={success} showIcon closable style={{ marginBottom: 16 }} />}
 
-      {/* Provider 列表 */}
-      <Card title="Provider 列表" style={{ marginBottom: 24 }}>
-        <Table
-          dataSource={providers}
-          columns={providerColumns}
-          rowKey="id"
-          pagination={false}
-          size="middle"
-          expandable={{
-            expandedRowRender: (record) => (
-              <div style={{ padding: '0 24px' }}>
-                <Text strong>模型列表：</Text>
-                <div style={{ marginTop: 8 }}>
-                  {record.models.length === 0 ? (
-                    <Text type="secondary">暂无模型</Text>
-                  ) : (
-                    <Space wrap>
-                      {record.models.map((model) => (
-                        <Tag key={model.id} color="blue">
-                          {model.name}
-                          <Text type="secondary" style={{ marginLeft: 4, fontSize: 11 }}>
-                            ({model.contextWindow / 1000}K)
-                          </Text>
-                        </Tag>
-                      ))}
-                    </Space>
-                  )}
-                </div>
-              </div>
+      <Tabs
+        defaultActiveKey="providers"
+        items={[
+          {
+            key: 'providers',
+            label: (
+              <Space>
+                <CloudServerOutlined />
+                Provider 列表
+              </Space>
             ),
-          }}
-        />
-      </Card>
+            children: (
+              <Table
+                dataSource={providers}
+                columns={providerColumns}
+                rowKey="id"
+                pagination={false}
+                size="middle"
+                expandable={{
+                  expandedRowRender: (record) => (
+                    <div style={{ padding: '0 24px' }}>
+                      <Text strong>模型列表：</Text>
+                      <div style={{ marginTop: 8 }}>
+                        {record.models.length === 0 ? (
+                          <Text type="secondary">暂无模型</Text>
+                        ) : (
+                          <Space wrap>
+                            {record.models.map((model) => (
+                              <Card key={model.id} size="small" style={{ width: 280 }}>
+                                <div style={{ lineHeight: 2 }}>
+                                  <div><Text strong>{model.name}</Text></div>
+                                  <div><Text type="secondary">ID：</Text><Text code style={{ fontSize: 11 }}>{model.id}</Text></div>
+                                  <div><Text type="secondary">上下文：</Text><Tag>{(model.contextWindow / 1000).toFixed(0)}K</Tag></div>
+                                  <div><Text type="secondary">最大输出：</Text><Tag>{model.maxTokens}</Tag></div>
+                                  {model.reasoning && <div><Tag color="purple">推理模型</Tag></div>}
+                                  {model.input && <div><Text type="secondary">输入：</Text>{model.input.join(', ')}</div>}
+                                </div>
+                              </Card>
+                            ))}
+                          </Space>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                }}
+              />
+            ),
+          },
+          {
+            key: 'aliases',
+            label: (
+              <Space>
+                <SettingOutlined />
+                模型别名
+              </Space>
+            ),
+            children: (
+              <Table
+                dataSource={modelAliases}
+                columns={[
+                  {
+                    title: '模型 ID',
+                    dataIndex: 'modelId',
+                    key: 'modelId',
+                    render: (id: string) => <Text code>{id}</Text>,
+                  },
+                  {
+                    title: '别名',
+                    dataIndex: 'alias',
+                    key: 'alias',
+                    render: (alias: string) => alias ? <Tag color="blue">{alias}</Tag> : <Text type="secondary">无</Text>,
+                  },
+                ]}
+                rowKey="modelId"
+                pagination={false}
+                size="small"
+              />
+            ),
+          },
+          {
+            key: 'auth',
+            label: (
+              <Space>
+                <KeyOutlined />
+                认证配置
+              </Space>
+            ),
+            children: (
+              <Table
+                dataSource={Object.entries(authProfiles).map(([key, value]) => ({ key, ...value }))}
+                columns={[
+                  {
+                    title: 'Profile',
+                    dataIndex: 'key',
+                    key: 'key',
+                    render: (key: string) => <Text code>{key}</Text>,
+                  },
+                  {
+                    title: 'Provider',
+                    dataIndex: 'provider',
+                    key: 'provider',
+                    render: (provider: string) => <Tag>{provider}</Tag>,
+                  },
+                  {
+                    title: '认证模式',
+                    dataIndex: 'mode',
+                    key: 'mode',
+                    render: (mode: string) => <Tag color="green">{mode}</Tag>,
+                  },
+                ]}
+                rowKey="key"
+                pagination={false}
+                size="small"
+              />
+            ),
+          },
+          {
+            key: 'global',
+            label: (
+              <Space>
+                <ApiOutlined />
+                全局配置
+              </Space>
+            ),
+            children: globalConfig && (
+              <Card size="small">
+                <div style={{ lineHeight: 2.5 }}>
+                  <div><Text type="secondary">模式：</Text><Tag>{globalConfig.mode}</Tag></div>
+                  <div><Text type="secondary">工作区：</Text><Text code>{globalConfig.workspace}</Text></div>
+                  <div><Text type="secondary">压缩模式：</Text><Tag>{globalConfig.compaction.mode}</Tag></div>
+                  <div><Text type="secondary">最大并发：</Text><Tag>{globalConfig.maxConcurrent}</Tag></div>
+                  <div><Text type="secondary">子代理最大并发：</Text><Tag>{globalConfig.subagents.maxConcurrent}</Tag></div>
+                </div>
+              </Card>
+            ),
+          },
+        ]}
+      />
 
       {/* 快速添加模型 */}
       <Card
         title="快速添加模型"
         size="small"
+        style={{ marginTop: 16 }}
         extra={
           <Button
             type="link"
@@ -470,13 +644,13 @@ export default function ModelsPage() {
           <div>
             <Space>
               <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>API Key 使用密码输入框保护，不会明文显示</Text>
+              <Text>模型别名用于简化模型 ID 的引用</Text>
             </Space>
           </div>
           <div>
             <Space>
               <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>测试连通性会发送请求到 API 验证配置是否正确</Text>
+              <Text>API Key 使用密码输入框保护，不会明文显示</Text>
             </Space>
           </div>
         </div>
@@ -539,7 +713,7 @@ export default function ModelsPage() {
           <div>
             <Space>
               <Text>API Key</Text>
-              <Tooltip title="API 密钥，用于身份验证。请妥善保管，不要泄露">
+              <Tooltip title="API 密钥，用于身份验证">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>
@@ -554,7 +728,7 @@ export default function ModelsPage() {
           <div>
             <Space>
               <Text>API 类型</Text>
-              <Tooltip title="API 的协议类型，大多数提供商使用 OpenAI 兼容格式">
+              <Tooltip title="API 的协议类型">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>
@@ -601,7 +775,7 @@ export default function ModelsPage() {
           <div>
             <Space>
               <Text>模型 ID <Text type="danger">*</Text></Text>
-              <Tooltip title="模型的唯一标识符，如 gpt-4、claude-3-opus">
+              <Tooltip title="模型的唯一标识符">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>
@@ -615,7 +789,7 @@ export default function ModelsPage() {
           <div>
             <Space>
               <Text>显示名称</Text>
-              <Tooltip title="模型的显示名称，用于界面展示">
+              <Tooltip title="模型的显示名称">
                 <QuestionCircleOutlined style={{ color: '#999' }} />
               </Tooltip>
             </Space>

@@ -141,3 +141,7 @@ export async function listLocalSkills(agentId: string): Promise<AgentSkillsInfo>
 export async function listAllAgentsSkills(): Promise<AgentSkillsInfo[]> {
   return invoke('list_all_agents_skills')
 }
+
+export async function deleteSkill(agentId: string, skillId: string): Promise<string> {
+  return invoke('delete_skill', { agentId, skillId })
+}

@@ -193,3 +193,33 @@ fn parse_skill_md(path: &PathBuf) -> (String, String, Option<String>) {
         ),
     }
 }
+
+/// 删除指定 Agent 的指定 Skill
+#[tauri::command]
+pub async fn delete_skill(agent_id: String, skill_id: String) -> Result<String, AppError> {
+    let home = dirs::home_dir().unwrap_or_default();
+    let skills_path = if agent_id == "main" {
+        home.join(".openclaw").join("workspace").join("skills")
+    } else {
+        home.join(".openclaw").join(format!("workspace-{}", agent_id)).join("skills")
+    };
+
+    let skill_path = skills_path.join(&skill_id);
+
+    // 检查路径是否存在
+    if !skill_path.exists() {
+        return Err(AppError::new(
+            ErrorCode::FileSystemError,
+            &format!("Skill 目录不存在: {}", skill_path.display()),
+        ));
+    }
+
+    // 删除目录
+    std::fs::remove_dir_all(&skill_path)
+        .map_err(|e| AppError::new(
+            ErrorCode::FileSystemError,
+            &format!("删除 Skill 失败: {}", e),
+        ))?;
+
+    Ok(format!("已删除 Skill: {}", skill_id))
+}
