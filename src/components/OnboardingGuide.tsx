@@ -9,7 +9,7 @@ import {
   ApiOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../../services/tauri'
+import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../services/tauri'
 
 const { Step } = Steps
 
