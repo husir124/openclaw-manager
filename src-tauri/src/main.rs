@@ -1,8 +1,12 @@
 mod commands;
 mod error;
 mod platform;
+mod migration;
 
 fn main() {
+    // 启动时执行配置迁移
+    run_startup_migrations();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             // System detection
@@ -36,4 +40,44 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 启动时执行配置迁移
+fn run_startup_migrations() {
+    let config_path = platform::config_file_path();
+
+    if !config_path.exists() {
+        return;
+    }
+
+    // 读取配置
+    let config_str = match std::fs::read_to_string(&config_path) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
+    // 解析 JSON
+    let mut config: serde_json::Value = match serde_json::from_str(&config_str) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    // 执行迁移
+    match migration::run_migrations(&mut config) {
+        Ok(applied) => {
+            if !applied.is_empty() {
+                // 写回配置
+                if let Ok(new_config) = serde_json::to_string_pretty(&config) {
+                    let _ = std::fs::write(&config_path, new_config);
+                    println!("Applied {} migration(s):", applied.len());
+                    for m in applied {
+                        println!("  - {}", m);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Migration failed: {}", e);
+        }
+    }
 }
