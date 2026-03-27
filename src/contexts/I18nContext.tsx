@@ -1,49 +1,30 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { Language, getCurrentLanguage, setLanguage, t, TranslationKey } from '../i18n'
+import { createContext, useContext, useState, ReactNode } from 'react'
+
+type Language = 'zh' | 'en'
 
 interface I18nContextType {
   language: Language
   setLanguage: (lang: Language) => void
-  t: (key: TranslationKey) => string
 }
 
 const I18nContext = createContext<I18nContextType>({
   language: 'zh',
   setLanguage: () => {},
-  t: (key) => key,
 })
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(getCurrentLanguage())
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('ocm-language')
+    return (saved === 'en' ? 'en' : 'zh') as Language
+  })
 
   const handleSetLanguage = (lang: Language) => {
     setLanguageState(lang)
-    setLanguage(lang)
-    // 触发语言变化事件
-    window.dispatchEvent(new CustomEvent('language-change', { detail: lang }))
-  }
-
-  useEffect(() => {
-    // 监听语言变化
-    const handleStorage = () => {
-      setLanguageState(getCurrentLanguage())
-    }
-
-    window.addEventListener('storage', handleStorage)
-    window.addEventListener('language-change', handleStorage)
-
-    return () => {
-      window.removeEventListener('storage', handleStorage)
-      window.removeEventListener('language-change', handleStorage)
-    }
-  }, [])
-
-  const translate = (key: TranslationKey): string => {
-    return t(key, language)
+    localStorage.setItem('ocm-language', lang)
   }
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage, t: translate }}>
+    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage }}>
       {children}
     </I18nContext.Provider>
   )
