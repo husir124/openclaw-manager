@@ -89,24 +89,22 @@ pub async fn list_backups() -> Result<Vec<BackupFile>, AppError> {
     let entries = std::fs::read_dir(&backup_dir)
         .map_err(|e| AppError::new(ErrorCode::FileSystemError, &format!("读取备份目录失败: {}", e)))?;
 
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "ocbak") {
-                let metadata = entry.metadata().unwrap();
-                let name = path.file_name().unwrap().to_string_lossy().to_string();
-                let created = metadata.created()
-                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                let created_at: chrono::DateTime<chrono::Local> = created.into();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "ocbak") {
+            let metadata = entry.metadata().unwrap();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            let created = metadata.created()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            let created_at: chrono::DateTime<chrono::Local> = created.into();
 
-                backups.push(BackupFile {
-                    name,
-                    path: path.to_string_lossy().to_string(),
-                    size: metadata.len(),
-                    created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-                    encrypted: true,
-                });
-            }
+            backups.push(BackupFile {
+                name,
+                path: path.to_string_lossy().to_string(),
+                size: metadata.len(),
+                created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                encrypted: true,
+            });
         }
     }
 
@@ -248,12 +246,12 @@ fn derive_key(password: &str) -> [u8; 32] {
     let password_bytes = password.as_bytes();
 
     // 使用多次哈希来增强密钥
-    for i in 0..32 {
+    for (i, key_byte) in key.iter_mut().enumerate() {
         let mut hasher = DefaultHasher::new();
         password_bytes.hash(&mut hasher);
         i.hash(&mut hasher);
         let hash = hasher.finish();
-        key[i] = (hash & 0xFF) as u8;
+        *key_byte = (hash & 0xFF) as u8;
     }
 
     key

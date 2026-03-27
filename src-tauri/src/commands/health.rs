@@ -123,7 +123,7 @@ pub async fn get_logs(lines: usize) -> Result<String, AppError> {
         .map_err(|e| AppError::new(crate::error::ErrorCode::FileSystemError, &format!("读取日志目录失败: {}", e)))?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            entry.path().extension().map_or(false, |ext| ext == "log")
+            entry.path().extension().is_some_and(|ext| ext == "log")
         })
         .collect();
 
@@ -186,7 +186,7 @@ fn sanitize_logs(content: &str) -> String {
                 let start = pos + pattern.len();
                 if start < result.len() {
                     // Find the end of the value (next comma, quote, or newline)
-                    let end = result[start..].find(|c: char| c == ',' || c == '"' || c == '\n' || c == '}')
+                    let end = result[start..].find([',', '"', '\n', '}'])
                         .map(|e| start + e)
                         .unwrap_or(result.len());
                     result.replace_range(start..end, "***");

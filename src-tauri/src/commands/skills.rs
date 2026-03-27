@@ -150,9 +150,9 @@ fn parse_skill_md(path: &PathBuf) -> (String, String, Option<String>) {
             let mut version = None;
 
             // 解析 frontmatter
-            if content.starts_with("---") {
-                if let Some(end) = content[3..].find("---") {
-                    let frontmatter = &content[3..end + 3];
+            if let Some(rest) = content.strip_prefix("---") {
+                if let Some(end) = rest.find("---") {
+                    let frontmatter = &rest[..end];
                     for line in frontmatter.lines() {
                         if let Some(val) = line.strip_prefix("name:") {
                             name = val.trim().trim_matches('"').to_string();
@@ -168,8 +168,8 @@ fn parse_skill_md(path: &PathBuf) -> (String, String, Option<String>) {
             // 如果没有 frontmatter，用第一行标题
             if name.is_empty() {
                 for line in content.lines() {
-                    if line.starts_with("# ") {
-                        name = line[2..].trim().to_string();
+                    if let Some(stripped) = line.strip_prefix("# ") {
+                        name = stripped.trim().to_string();
                         break;
                     }
                 }
