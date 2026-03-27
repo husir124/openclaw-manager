@@ -29,7 +29,20 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/icon.ico"
-    ]
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "copyright": "© 2026 OpenClaw Manager. All rights reserved.",
+    "category": "DeveloperTool",
+    "shortDescription": "Desktop management GUI for OpenClaw",
+    "longDescription": "OpenClaw Manager is a desktop application that provides a graphical interface for managing OpenClaw, the personal AI assistant platform."
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/husir124/openclaw-manager/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
