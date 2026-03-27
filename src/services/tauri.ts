@@ -145,3 +145,35 @@ export async function listAllAgentsSkills(): Promise<AgentSkillsInfo[]> {
 export async function deleteSkill(agentId: string, skillId: string): Promise<string> {
   return invoke('delete_skill', { agentId, skillId })
 }
+
+// App Info
+export interface AppInfo {
+  version: string
+  name: string
+  config_dir: string
+  logs_dir: string
+  backups_dir: string
+}
+
+export interface DiskUsage {
+  total_bytes: number
+  logs_bytes: number
+  backups_bytes: number
+  workspace_bytes: number
+  formatted_total: string
+  formatted_logs: string
+  formatted_backups: string
+  formatted_workspace: string
+}
+
+export async function getAppInfo(): Promise<AppInfo> {
+  return invoke('get_app_info')
+}
+
+export async function clearCache(): Promise<string> {
+  return invoke('clear_cache')
+}
+
+export async function getDiskUsage(): Promise<DiskUsage> {
+  return invoke('get_disk_usage')
+}

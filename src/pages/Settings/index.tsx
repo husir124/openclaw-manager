@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Switch, Select, Input, Alert, Divider, Tooltip } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Switch, Select, Input, Alert, Divider, Tooltip, Progress } from 'antd'
 import {
   SettingOutlined,
   ReloadOutlined,
@@ -9,8 +9,10 @@ import {
   GlobalOutlined,
   CloudServerOutlined,
   InfoCircleOutlined,
+  ClearOutlined,
+  FolderOutlined,
 } from '@ant-design/icons'
-import { readConfig, writeConfig, startGateway, stopGateway, checkGatewayStatus } from '../../services/tauri'
+import { readConfig, writeConfig, startGateway, stopGateway, checkGatewayStatus, getAppInfo, clearCache, getDiskUsage, type AppInfo, type DiskUsage } from '../../services/tauri'
 
 const { Title, Text, Link } = Typography
 
@@ -91,8 +93,12 @@ export default function SettingsPage() {
   const [gatewayPort, setGatewayPort] = useState(18789)
   const [gatewayPid, setGatewayPid] = useState<number | null>(null)
 
+  // 应用信息
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [diskUsage, setDiskUsage] = useState<DiskUsage | null>(null)
+  const [clearingCache, setClearingCache] = useState(false)
+
   // 版本信息
-  const [appVersion] = useState('0.1.0')
   const [openclawVersion, setOpenclawVersion] = useState<string | null>(null)
 
   const loadSettings = async () => {
@@ -142,6 +148,14 @@ export default function SettingsPage() {
 
       // 获取版本
       setOpenclawVersion((metaConfig.lastTouchedVersion as string) || null)
+
+      // 获取应用信息
+      const info = await getAppInfo()
+      setAppInfo(info)
+
+      // 获取磁盘使用情况
+      const usage = await getDiskUsage()
+      setDiskUsage(usage)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载设置失败')
     } finally {
@@ -476,11 +490,22 @@ export default function SettingsPage() {
             关于
           </Space>
         }
+        style={{ marginBottom: 16 }}
       >
         <div style={{ lineHeight: 2.5 }}>
-          <div>
-            <Text type="secondary">应用版本：</Text>
-            <Tag>v{appVersion}</Tag>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <Text type="secondary">应用版本：</Text>
+              <Tag>v{appInfo?.version || '0.1.0'}</Tag>
+            </div>
+            <Button
+              size="small"
+              onClick={() => {
+                window.open('https://github.com/husir124/openclaw-manager/releases', '_blank')
+              }}
+            >
+              检查更新
+            </Button>
           </div>
           {openclawVersion && (
             <div>
@@ -507,6 +532,68 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
+      </Card>
+
+      {/* 磁盘使用 */}
+      <Card
+        title={
+          <Space>
+            <FolderOutlined />
+            磁盘使用
+          </Space>
+        }
+        extra={
+          <Button
+            size="small"
+            icon={<ClearOutlined />}
+            loading={clearingCache}
+            onClick={async () => {
+              setClearingCache(true)
+              try {
+                const result = await clearCache()
+                setSuccess(result)
+                const usage = await getDiskUsage()
+                setDiskUsage(usage)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : '清理失败')
+              } finally {
+                setClearingCache(false)
+              }
+            }}
+          >
+            清理缓存
+          </Button>
+        }
+      >
+        {diskUsage ? (
+          <div style={{ lineHeight: 2.5 }}>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary">总占用：</Text>
+              <Text strong>{diskUsage.formatted_total}</Text>
+              <Progress
+                percent={Math.min(100, (diskUsage.total_bytes / (1024 * 1024 * 1024)) * 10)}
+                size="small"
+                style={{ marginTop: 8 }}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <Text type="secondary">工作区：</Text>
+                <div>{diskUsage.formatted_workspace}</div>
+              </div>
+              <div>
+                <Text type="secondary">日志：</Text>
+                <div>{diskUsage.formatted_logs}</div>
+              </div>
+              <div>
+                <Text type="secondary">备份：</Text>
+                <div>{diskUsage.formatted_backups}</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Spin />
+        )}
       </Card>
     </div>
   )

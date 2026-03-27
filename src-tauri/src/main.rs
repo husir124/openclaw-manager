@@ -37,6 +37,10 @@ fn main() {
             commands::skills::list_local_skills,
             commands::skills::list_all_agents_skills,
             commands::skills::delete_skill,
+            // App Info
+            commands::app_info::get_app_info,
+            commands::app_info::clear_cache,
+            commands::app_info::get_disk_usage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
