@@ -37,6 +37,9 @@ export default function HealthPage() {
   const [showFixConfirm, setShowFixConfirm] = useState<DiagnosticItem | null>(null)
   const [logs, setLogs] = useState<LogLine[]>([])
   const [logLines, setLogLines] = useState(50)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [refreshInterval, setRefreshInterval] = useState(30) // 秒
 
   const runDiagnosis = async () => {
     setLoading(true)
@@ -93,6 +96,7 @@ export default function HealthPage() {
       ]
 
       setDiagnostics(items)
+      setLastUpdate(new Date())
     } catch (err) {
       console.error('Diagnosis failed:', err)
     } finally {
@@ -139,7 +143,19 @@ export default function HealthPage() {
   useEffect(() => {
     runDiagnosis()
     loadLogs()
-  }, [])
+
+    // 定时刷新
+    let interval: ReturnType<typeof setInterval> | null = null
+    if (autoRefresh) {
+      interval = setInterval(() => {
+        runDiagnosis()
+      }, refreshInterval * 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [autoRefresh, refreshInterval])
 
   const okCount = diagnostics.filter(d => d.status === 'ok').length
   const errorCount = diagnostics.filter(d => d.status === 'error').length
@@ -172,9 +188,23 @@ export default function HealthPage() {
         <Title level={3} style={{ margin: 0 }}>
           <HeartOutlined /> 健康监控
         </Title>
-        <Button icon={<SyncOutlined />} onClick={runDiagnosis} loading={loading}>
-          重新诊断
-        </Button>
+        <Space>
+          {lastUpdate && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              最后更新: {lastUpdate.toLocaleTimeString()}
+            </Text>
+          )}
+          <Button
+            size="small"
+            type={autoRefresh ? 'primary' : 'default'}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            {autoRefresh ? '自动刷新: 开' : '自动刷新: 关'}
+          </Button>
+          <Button icon={<SyncOutlined />} onClick={runDiagnosis} loading={loading}>
+            刷新
+          </Button>
+        </Space>
       </div>
 
       {/* Summary */}
