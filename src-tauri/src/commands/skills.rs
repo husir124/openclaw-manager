@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use crate::error::{AppError, ErrorCode};
-use crate::platform;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]

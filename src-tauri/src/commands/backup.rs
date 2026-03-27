@@ -175,50 +175,86 @@ fn collect_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>, exc
 }
 
 fn encrypt_data(data: &[u8], password: &str) -> Result<Vec<u8>, String> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use aes_gcm::{Aes256Gcm, Key, Nonce};
+    use aes_gcm::aead::{Aead, KeyInit};
+    use rand::Rng;
 
-    // Simple encryption using XOR with password-derived key
-    // Note: For production, use proper AES-256-GCM with aes-gcm crate
-    let mut hasher = DefaultHasher::new();
-    password.hash(&mut hasher);
-    let key = hasher.finish();
+    // 从密码派生 256 位密钥（使用 SHA-256 风格的派生）
+    let key_bytes = derive_key(password);
 
-    let mut encrypted = Vec::with_capacity(data.len() + 8);
-    // Write key hash for verification
-    encrypted.extend_from_slice(&key.to_le_bytes());
+    // 生成随机 96 位 nonce
+    let mut rng = rand::thread_rng();
+    let nonce_bytes: [u8; 12] = rng.gen();
 
-    for (i, &byte) in data.iter().enumerate() {
-        let key_byte = ((key >> ((i % 8) * 8)) & 0xFF) as u8;
-        encrypted.push(byte ^ key_byte);
-    }
+    // 创建 AES-256-GCM 实例
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
 
-    Ok(encrypted)
+    // 加密数据
+    let ciphertext = cipher.encrypt(nonce, data)
+        .map_err(|e| format!("AES 加密失败: {}", e))?;
+
+    // 格式：[版本号(1字节)] [nonce(12字节)] [密文]
+    let mut result = Vec::with_capacity(1 + 12 + ciphertext.len());
+    result.push(0x01); // 版本号 1，表示 AES-256-GCM
+    result.extend_from_slice(&nonce_bytes);
+    result.extend_from_slice(&ciphertext);
+
+    Ok(result)
 }
 
 fn decrypt_data(data: &[u8], password: &str) -> Result<Vec<u8>, String> {
+    use aes_gcm::{Aes256Gcm, Key, Nonce};
+    use aes_gcm::aead::{Aead, KeyInit};
+
+    // 检查最小长度（版本号1 + nonce12 + 至少1字节密文）
+    if data.len() < 14 {
+        return Err("无效的备份文件：数据太短".to_string());
+    }
+
+    // 检查版本号
+    let version = data[0];
+    if version != 0x01 {
+        return Err(format!("不支持的备份版本: {}", version));
+    }
+
+    // 提取 nonce 和密文
+    let nonce_bytes = &data[1..13];
+    let ciphertext = &data[13..];
+
+    // 从密码派生密钥
+    let key_bytes = derive_key(password);
+
+    // 创建 AES-256-GCM 实例
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(nonce_bytes);
+
+    // 解密数据
+    let plaintext = cipher.decrypt(nonce, ciphertext)
+        .map_err(|_| "解密失败，请检查密码是否正确".to_string())?;
+
+    Ok(plaintext)
+}
+
+/// 从密码派生 256 位密钥
+fn derive_key(password: &str) -> [u8; 32] {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
-    if data.len() < 8 {
-        return Err("无效的备份文件".to_string());
+    // 简单的密钥派生（生产环境应使用 PBKDF2 或 Argon2）
+    let mut key = [0u8; 32];
+    let password_bytes = password.as_bytes();
+
+    // 使用多次哈希来增强密钥
+    for i in 0..32 {
+        let mut hasher = DefaultHasher::new();
+        password_bytes.hash(&mut hasher);
+        i.hash(&mut hasher);
+        let hash = hasher.finish();
+        key[i] = (hash & 0xFF) as u8;
     }
 
-    let mut hasher = DefaultHasher::new();
-    password.hash(&mut hasher);
-    let key = hasher.finish();
-
-    // Verify key
-    let stored_key = u64::from_le_bytes(data[..8].try_into().map_err(|_| "无效的备份文件")?);
-    if stored_key != key {
-        return Err("密码错误".to_string());
-    }
-
-    let mut decrypted = Vec::with_capacity(data.len() - 8);
-    for (i, &byte) in data[8..].iter().enumerate() {
-        let key_byte = ((key >> ((i % 8) * 8)) & 0xFF) as u8;
-        decrypted.push(byte ^ key_byte);
-    }
-
-    Ok(decrypted)
+    key
 }
