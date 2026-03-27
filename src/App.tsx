@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import MainLayout from './layouts/MainLayout'
 import SetupPage from './pages/Setup'
 import DashboardPage from './pages/Dashboard'
@@ -14,21 +15,23 @@ import SettingsPage from './pages/Settings'
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/models" element={<ModelsPage />} />
-        <Route path="/channels" element={<ChannelsPage />} />
-        <Route path="/agents" element={<AgentsPage />} />
-        <Route path="/skills" element={<SkillsPage />} />
-        <Route path="/health" element={<HealthPage />} />
-        <Route path="/backup" element={<BackupPage />} />
-        <Route path="/config" element={<ConfigPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-      </Route>
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/models" element={<ModelsPage />} />
+          <Route path="/channels" element={<ChannelsPage />} />
+          <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/skills" element={<SkillsPage />} />
+          <Route path="/health" element={<HealthPage />} />
+          <Route path="/backup" element={<BackupPage />} />
+          <Route path="/config" element={<ConfigPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </ErrorBoundary>
   )
 }
