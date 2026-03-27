@@ -114,3 +114,30 @@ export async function restoreBackup(filePath: string, password: string): Promise
 export async function getBackupProgress(): Promise<number> {
   return invoke('get_backup_progress')
 }
+
+// Skills
+export interface SkillInfo {
+  id: string
+  name: string
+  description: string
+  version: string | null
+  path: string
+  agent_id: string
+  has_skill_md: boolean
+}
+
+export interface AgentSkillsInfo {
+  agent_id: string
+  agent_name: string
+  skills_path: string
+  skills: SkillInfo[]
+  error: string | null
+}
+
+export async function listLocalSkills(agentId: string): Promise<AgentSkillsInfo> {
+  return invoke('list_local_skills', { agentId })
+}
+
+export async function listAllAgentsSkills(): Promise<AgentSkillsInfo[]> {
+  return invoke('list_all_agents_skills')
+}

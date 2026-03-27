@@ -29,6 +29,9 @@ fn main() {
             commands::backup::list_backups,
             commands::backup::restore_backup,
             commands::backup::get_backup_progress,
+            // Skills
+            commands::skills::list_local_skills,
+            commands::skills::list_all_agents_skills,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
