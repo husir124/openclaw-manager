@@ -8,6 +8,7 @@ fn main() {
     run_startup_migrations();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             // System detection
             commands::system::check_node_version,
@@ -41,6 +42,7 @@ fn main() {
             commands::app_info::get_app_info,
             commands::app_info::clear_cache,
             commands::app_info::get_disk_usage,
+            commands::app_info::open_releases_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

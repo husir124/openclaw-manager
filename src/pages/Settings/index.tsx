@@ -500,8 +500,14 @@ export default function SettingsPage() {
             </div>
             <Button
               size="small"
-              onClick={() => {
-                window.open('https://github.com/husir124/openclaw-manager/releases', '_blank')
+              onClick={async () => {
+                try {
+                  const { openReleasesPage } = await import('../../services/tauri')
+                  const url = await openReleasesPage()
+                  window.open(url, '_blank')
+                } catch {
+                  window.open('https://github.com/husir124/openclaw-manager/releases', '_blank')
+                }
               }}
             >
               检查更新

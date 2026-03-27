@@ -73,6 +73,13 @@ pub async fn get_disk_usage() -> Result<DiskUsage, AppError> {
     })
 }
 
+/// 检查更新（预留，打开 GitHub Releases 页面）
+#[tauri::command]
+pub async fn open_releases_page() -> Result<String, AppError> {
+    // 打开浏览器跳转到 GitHub Releases
+    Ok("https://github.com/husir124/openclaw-manager/releases".to_string())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DiskUsage {
     pub total_bytes: u64,

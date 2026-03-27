@@ -177,3 +177,7 @@ export async function clearCache(): Promise<string> {
 export async function getDiskUsage(): Promise<DiskUsage> {
   return invoke('get_disk_usage')
 }
+
+export async function openReleasesPage(): Promise<string> {
+  return invoke('open_releases_page')
+}
