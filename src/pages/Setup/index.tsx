@@ -68,8 +68,8 @@ export default function SetupPage() {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Title level={3}>OpenClaw Manager - Setup</Title>
-      <Text type="secondary">Detect your environment</Text>
+      <Title level={3}>OpenClaw Manager - 环境检测</Title>
+      <Text type="secondary">检测您的运行环境</Text>
 
       <Divider />
 
@@ -77,10 +77,10 @@ export default function SetupPage() {
         current={getStepStatus()}
         status={allReady ? 'finish' : 'process'}
         items={[
-          { title: 'Node.js', description: 'Runtime' },
-          { title: 'OpenClaw', description: 'AI Platform' },
-          { title: 'Gateway', description: 'Service Running' },
-          { title: 'Done', description: 'Ready to use' },
+          { title: 'Node.js', content: '运行环境' },
+          { title: 'OpenClaw', content: 'AI 平台' },
+          { title: 'Gateway', content: '服务运行中' },
+          { title: '完成', content: '一切就绪' },
         ]}
       />
 
@@ -89,33 +89,33 @@ export default function SetupPage() {
           <Card>
             <div style={{ textAlign: 'center', padding: 40 }}>
               <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
-              <div style={{ marginTop: 16 }}>Detecting environment...</div>
+              <div style={{ marginTop: 16 }}>正在检测环境...</div>
             </div>
           </Card>
         ) : (
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             {/* Node.js */}
             <Card
               title={<Space><CloudServerOutlined /> Node.js</Space>}
               extra={
                 nodeInfo?.installed ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>Installed</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>已安装</Tag>
                 ) : (
-                  <Tag color="error" icon={<CloseCircleOutlined />}>Not Found</Tag>
+                  <Tag color="error" icon={<CloseCircleOutlined />}>未找到</Tag>
                 )
               }
             >
               {nodeInfo?.installed ? (
-                <Space direction="vertical">
+                <Space orientation="vertical">
                   <Text>Version: <strong>{nodeInfo.version}</strong></Text>
                   {nodeInfo.meets_minimum ? (
-                    <Text type="success">{'Version OK (>= 22.14)'}</Text>
+                    <Text type="success">{'版本满足要求 (>= 22.14)'}</Text>
                   ) : (
-                    <Alert type="warning" message="Version too low, upgrade to Node.js 24" showIcon />
+                    <Alert type="warning" title="版本过低，请升级到 Node.js 24" showIcon />
                   )}
                 </Space>
               ) : (
-                <Alert type="error" message="Node.js not found" description="Install Node.js 24+: https://nodejs.org" showIcon />
+                <Alert type="error" title="未找到 Node.js" description="安装 Node.js 24+: https://nodejs.org" showIcon />
               )}
             </Card>
 
@@ -124,24 +124,24 @@ export default function SetupPage() {
               title={<Space><RocketOutlined /> OpenClaw</Space>}
               extra={
                 openclawInfo?.installed ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>Installed</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>已安装</Tag>
                 ) : (
-                  <Tag color="error" icon={<CloseCircleOutlined />}>Not Found</Tag>
+                  <Tag color="error" icon={<CloseCircleOutlined />}>未找到</Tag>
                 )
               }
             >
               {openclawInfo?.installed ? (
-                <Space direction="vertical">
+                <Space orientation="vertical">
                   <Text>Version: <strong>{openclawInfo.version}</strong></Text>
                   {openclawInfo.path && (
-                    <Text type="secondary" style={{ fontSize: 12 }}>Path: {openclawInfo.path}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>路径: {openclawInfo.path}</Text>
                   )}
                 </Space>
               ) : (
-                <Space direction="vertical">
-                  <Alert type="warning" message="OpenClaw not installed" showIcon />
+                <Space orientation="vertical">
+                  <Alert type="warning" title="未安装 OpenClaw" showIcon />
                   <Button type="primary" onClick={() => window.open('https://docs.openclaw.ai/start/getting-started', '_blank')}>
-                    Installation Guide
+                    安装指南
                   </Button>
                 </Space>
               )}
@@ -152,20 +152,20 @@ export default function SetupPage() {
               title={<Space><ApiOutlined /> Gateway</Space>}
               extra={
                 gatewayStatus?.running ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>Running</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>运行中</Tag>
                 ) : (
-                  <Tag color="default" icon={<CloseCircleOutlined />}>Stopped</Tag>
+                  <Tag color="default" icon={<CloseCircleOutlined />}>已停止</Tag>
                 )
               }
             >
               {gatewayStatus?.running ? (
-                <Space direction="vertical">
-                  <Text>Port: <strong>{gatewayStatus.port}</strong></Text>
-                  {gatewayStatus.pid && <Text type="secondary">PID: {gatewayStatus.pid}</Text>}
+                <Space orientation="vertical">
+                  <Text>端口: <strong>{gatewayStatus.port}</strong></Text>
+                  {gatewayStatus.pid && <Text type="secondary">进程 ID: {gatewayStatus.pid}</Text>}
                 </Space>
               ) : (
-                <Space direction="vertical">
-                  <Text>Gateway is not running</Text>
+                <Space orientation="vertical">
+                  <Text>Gateway 未运行</Text>
                   <Button
                     type="primary"
                     icon={<SyncOutlined />}
@@ -173,7 +173,7 @@ export default function SetupPage() {
                     onClick={handleStartGateway}
                     disabled={!openclawInfo?.installed}
                   >
-                    Start Gateway
+                    启动 Gateway
                   </Button>
                 </Space>
               )}
@@ -184,16 +184,16 @@ export default function SetupPage() {
 
       {allReady && (
         <div style={{ marginTop: 24, textAlign: 'center' }}>
-          <Alert type="success" message="All environment ready!" showIcon />
+          <Alert type="success" title="环境检测完成，一切就绪！" showIcon />
           <Button type="primary" size="large" style={{ marginTop: 16 }} onClick={() => navigate('/dashboard')}>
-            Go to Dashboard
+            进入 Dashboard
           </Button>
         </div>
       )}
 
       <div style={{ marginTop: 16, textAlign: 'center' }}>
         <Button type="link" onClick={detectAll} loading={loading}>
-          <SyncOutlined /> Re-detect
+          <SyncOutlined /> 重新检测
         </Button>
       </div>
     </div>

@@ -69,3 +69,48 @@ export async function startGateway(): Promise<string> {
 export async function stopGateway(): Promise<string> {
   return invoke('stop_gateway')
 }
+
+// Health
+export interface DiagnosticResult {
+  id: string
+  name: string
+  status: 'ok' | 'warning' | 'error'
+  message: string
+}
+
+export async function runDiagnosis(): Promise<DiagnosticResult[]> {
+  return invoke('run_diagnosis')
+}
+
+export async function fixIssue(issueId: string): Promise<string> {
+  return invoke('fix_issue', { issueId })
+}
+
+export async function getLogs(lines: number): Promise<string> {
+  return invoke('get_logs', { lines })
+}
+
+// Backup
+export interface BackupFile {
+  name: string
+  path: string
+  size: number
+  created_at: string
+  encrypted: boolean
+}
+
+export async function createBackup(password: string): Promise<string> {
+  return invoke('create_backup', { password })
+}
+
+export async function listBackups(): Promise<BackupFile[]> {
+  return invoke('list_backups')
+}
+
+export async function restoreBackup(filePath: string, password: string): Promise<string> {
+  return invoke('restore_backup', { filePath, password })
+}
+
+export async function getBackupProgress(): Promise<number> {
+  return invoke('get_backup_progress')
+}

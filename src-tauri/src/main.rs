@@ -20,9 +20,15 @@ fn main() {
             // Process management
             commands::process::start_gateway,
             commands::process::stop_gateway,
-            // Backup
-            commands::backup::backup_config,
-            commands::backup::restore_config,
+            // Health monitoring
+            commands::health::run_diagnosis,
+            commands::health::fix_issue,
+            commands::health::get_logs,
+            // Backup & Restore
+            commands::backup::create_backup,
+            commands::backup::list_backups,
+            commands::backup::restore_backup,
+            commands::backup::get_backup_progress,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

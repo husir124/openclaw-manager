@@ -72,6 +72,11 @@ pub fn openclaw_bin_path() -> Option<PathBuf> {
 
 /// 执行命令并返回输出（带超时）
 pub fn run_command(program: &str, args: &[&str], _timeout_secs: u64) -> Result<String, super::error::AppError> {
+    exec_command(program, args)
+}
+
+/// 执行命令并返回输出（简洁版本）
+pub fn exec_command(program: &str, args: &[&str]) -> Result<String, super::error::AppError> {
     use super::error::{AppError, ErrorCode};
 
     let mut cmd = Command::new(program);

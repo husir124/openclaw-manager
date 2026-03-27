@@ -8,6 +8,7 @@ import {
   RobotOutlined,
   AppstoreOutlined,
   HeartOutlined,
+  FolderOutlined,
   SettingOutlined,
   RocketOutlined,
   CodeOutlined,
@@ -28,6 +29,7 @@ const menuItems = [
   { key: '/agents', icon: <RobotOutlined />, label: 'Agents' },
   { key: '/skills', icon: <AppstoreOutlined />, label: 'Skills' },
   { key: '/health', icon: <HeartOutlined />, label: 'Health' },
+  { key: '/backup', icon: <FolderOutlined />, label: 'Backup' },
   { key: '/config', icon: <CodeOutlined />, label: 'Config' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ]
