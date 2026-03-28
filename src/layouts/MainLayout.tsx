@@ -133,7 +133,7 @@ export default function MainLayout() {
           textAlign: 'center',
           color: isDark ? '#fff' : '#000',
         }}>
-          <span style={{ fontSize: 20, fontWeight: 'bold' }}>{'{'} OC {'}'}</span>
+          <span style={{ fontSize: 20, fontWeight: 'bold' }}>Hi OpenClaw</span>
         </div>
         <Menu
           mode="inline"
