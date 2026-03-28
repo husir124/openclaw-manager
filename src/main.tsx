@@ -1,26 +1,89 @@
-import React from 'react'
+import React, { useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import App from './App'
 import './index.css'
 
-function ThemedApp({ children }: { children: React.ReactNode }) {
-  const { isDark } = useTheme()
+// === Theme ===
+type ThemeMode = 'light' | 'dark' | 'system'
 
+interface ThemeContextType {
+  themeMode: ThemeMode
+  isDark: boolean
+  setThemeMode: (mode: ThemeMode) => void
+}
+
+const ThemeContext = React.createContext<ThemeContextType>({
+  themeMode: 'system',
+  isDark: false,
+  setThemeMode: () => {},
+})
+
+export function useTheme() {
+  return React.useContext(ThemeContext)
+}
+
+function resolveTheme(mode: ThemeMode): boolean {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+  return mode === 'dark'
+}
+
+function ThemeProvider({ children }: { children: ReactNode }) {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() =>
+    (localStorage.getItem('ocm-theme') as ThemeMode) || 'system'
+  )
+  const [isDark, setIsDark] = useState(() =>
+    resolveTheme((localStorage.getItem('ocm-theme') as ThemeMode) || 'system')
+  )
+
+  useEffect(() => {
+    if (themeMode !== 'system') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = () => setIsDark(mq.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [themeMode])
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeModeState(mode)
+    localStorage.setItem('ocm-theme', mode)
+    setIsDark(resolveTheme(mode))
+  }, [])
+
+  // Apply body styles
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDark) {
+      root.setAttribute('data-theme', 'dark')
+      document.body.style.background = '#141414'
+      document.body.style.color = 'rgba(255,255,255,0.88)'
+    } else {
+      root.setAttribute('data-theme', 'light')
+      document.body.style.background = '#f5f5f5'
+      document.body.style.color = 'rgba(0,0,0,0.88)'
+    }
+  }, [isDark])
+
+  const value = useMemo(() => ({ themeMode, isDark, setThemeMode }), [themeMode, isDark, setThemeMode])
+
+  // Use boolean key to force full remount on theme change
   return (
-    <ConfigProvider
-      key={isDark ? 'dark' : 'light'}
-      locale={zhCN}
-      theme={{
-        algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        token: { borderRadius: 6 },
-      }}
-    >
-      {children}
-    </ConfigProvider>
+    <ThemeContext.Provider value={value}>
+      <ConfigProvider
+        key={String(isDark)}
+        locale={zhCN}
+        theme={{
+          algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+          token: { borderRadius: 6 },
+        }}
+      >
+        {children}
+      </ConfigProvider>
+    </ThemeContext.Provider>
   )
 }
 
@@ -28,11 +91,9 @@ function Root() {
   return (
     <React.StrictMode>
       <BrowserRouter>
-        <ThemeContextProvider>
-          <ThemedApp>
-            <App />
-          </ThemedApp>
-        </ThemeContextProvider>
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>
   )

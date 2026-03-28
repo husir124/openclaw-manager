@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Alert, Button, Tag, Space, Input, Divider, List, Modal, Tabs } from 'antd'
 import { ReloadOutlined, SaveOutlined, CodeOutlined, AppstoreOutlined, HistoryOutlined } from '@ant-design/icons'
 import { readConfig, writeConfig, listConfigSections, listConfigBackups, type ConfigSection } from '../../services/tauri'
+import { useTheme } from '../../main'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
 export default function ConfigPage() {
+  const { isDark } = useTheme()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rawContent, setRawContent] = useState('')
@@ -105,7 +107,8 @@ export default function ConfigPage() {
                       >
                         <pre style={{
                           fontSize: 11,
-                          background: '#f5f5f5',
+                          background: isDark ? '#1f1f1f' : '#f5f5f5',
+                          color: isDark ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.88)',
                           padding: 8,
                           borderRadius: 4,
                           maxHeight: 120,

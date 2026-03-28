@@ -19,7 +19,7 @@ import {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { OnboardingGuide } from '../components/OnboardingGuide'
 import { checkGatewayStatus } from '../services/tauri'
-import { useTheme } from '../contexts/ThemeContext'
+import { useTheme } from '../main'
 
 const { Header, Sider, Content } = Layout
 
