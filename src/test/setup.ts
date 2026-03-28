@@ -1,16 +1,4 @@
-import '@testing-library/jest-dom'
-
-// Mock Tauri API
-const mockInvoke = vi.fn()
-
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: mockInvoke,
-}))
-
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
-  emit: vi.fn(),
-}))
+import { vi } from 'vitest'
 
 // Mock localStorage
 const localStorageMock = {
@@ -35,5 +23,3 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 })
-
-export { mockInvoke }
