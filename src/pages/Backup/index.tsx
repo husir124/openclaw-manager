@@ -94,6 +94,8 @@ const BACKUP_PRESETS = [
 
 export default function BackupPage() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [backups, setBackups] = useState<BackupFile[]>([])
   const [creatingBackup, setCreatingBackup] = useState(false)
   const [restoringBackup, setRestoringBackup] = useState<string | null>(null)

@@ -57,7 +57,7 @@ export default function SetupPage() {
     }
   }
 
-  const allReady = nodeInfo?.meets_minimum && openclawInfo?.installed && gatewayStatus?.running
+  const allReady = nodeInfo?.meetsMinimum && openclawInfo?.installed && gatewayStatus?.running
 
   const getStepStatus = () => {
     if (!nodeInfo?.installed) return 0
@@ -108,7 +108,7 @@ export default function SetupPage() {
               {nodeInfo?.installed ? (
                 <Space orientation="vertical">
                   <Text>Version: <strong>{nodeInfo.version}</strong></Text>
-                  {nodeInfo.meets_minimum ? (
+                  {nodeInfo.meetsMinimum ? (
                     <Text type="success">{'版本满足要求 (>= 22.14)'}</Text>
                   ) : (
                     <Alert type="warning" title="版本过低，请升级到 Node.js 24" showIcon />

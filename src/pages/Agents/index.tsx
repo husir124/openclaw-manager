@@ -24,7 +24,6 @@ import {
 import { readConfig, writeConfig } from '../../services/tauri'
 
 const { Title, Text, Paragraph } = Typography
-const { Step } = Steps
 
 // 平台配置定义
 interface PlatformConfig {
@@ -172,7 +171,8 @@ export default function AgentsPage() {
       // Detect platform from channels config
       const getPlatform = (agentId: string): string | undefined => {
         const binding = bindingList.find(b => b.agentId === agentId)
-        return binding?.match?.channel as string | undefined
+        const match = binding?.match as Record<string, unknown> | undefined
+        return match?.channel as string | undefined
       }
 
       const agentInfos: AgentInfo[] = agentsList.map((a) => ({
@@ -630,12 +630,17 @@ export default function AgentsPage() {
           ),
         ]}
       >
-        <Steps current={currentStep} size="small" style={{ marginBottom: 24 }}>
-          <Step title="基本信息" />
-          <Step title="选择平台" />
-          <Step title="配置凭证" />
-          <Step title="确认创建" />
-        </Steps>
+        <Steps
+          current={currentStep}
+          size="small"
+          style={{ marginBottom: 24 }}
+          items={[
+            { title: '基本信息' },
+            { title: '选择平台' },
+            { title: '配置凭证' },
+            { title: '确认创建' },
+          ]}
+        />
 
         {renderStepContent()}
       </Modal>

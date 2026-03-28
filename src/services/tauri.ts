@@ -17,7 +17,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 // System
 export async function checkNodeVersion(): Promise<{
-  installed: boolean; version: string | null; meets_minimum: boolean
+  installed: boolean; version: string | null; meetsMinimum: boolean
 }> {
   return invoke('check_node_version')
 }

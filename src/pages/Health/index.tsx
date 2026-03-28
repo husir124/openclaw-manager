@@ -56,10 +56,10 @@ export default function HealthPage() {
           name: 'Node.js 运行环境',
           icon: <HeartOutlined />,
           status: node.installed
-            ? node.meets_minimum ? 'ok' : 'warning'
+            ? node.meetsMinimum ? 'ok' : 'warning'
             : 'error',
           message: node.installed
-            ? node.meets_minimum ? `版本 ${node.version}，满足要求` : `版本 ${node.version} 过低，建议升级到 24+`
+            ? node.meetsMinimum ? `版本 ${node.version}，满足要求` : `版本 ${node.version} 过低，建议升级到 24+`
             : '未找到 Node.js，请先安装',
           fixAction: node.installed ? undefined : async () => {
             window.open('https://nodejs.org', '_blank')

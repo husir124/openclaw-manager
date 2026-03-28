@@ -45,16 +45,16 @@ describe('tauri service', () => {
   // === System ===
   describe('checkNodeVersion', () => {
     it('should call invoke with correct command', async () => {
-      mockInvoke.mockResolvedValue({ installed: true, version: 'v24.14.0', meets_minimum: true })
+      mockInvoke.mockResolvedValue({ installed: true, version: 'v24.14.0', meetsMinimum: true })
       const result = await checkNodeVersion()
       expect(mockInvoke).toHaveBeenCalledWith('check_node_version')
       expect(result.installed).toBe(true)
       expect(result.version).toBe('v24.14.0')
-      expect(result.meets_minimum).toBe(true)
+      expect(result.meetsMinimum).toBe(true)
     })
 
     it('should handle not installed', async () => {
-      mockInvoke.mockResolvedValue({ installed: false, version: null, meets_minimum: false })
+      mockInvoke.mockResolvedValue({ installed: false, version: null, meetsMinimum: false })
       const result = await checkNodeVersion()
       expect(result.installed).toBe(false)
     })

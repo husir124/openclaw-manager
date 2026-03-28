@@ -22,7 +22,7 @@ import {
 } from '@ant-design/icons'
 import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../services/tauri'
 
-const { Step } = Steps
+// Ant Design 6: Steps 使用 items 属性，不再支持 Steps.Step
 
 interface OnboardingGuideProps {
   onComplete: () => void
@@ -48,7 +48,7 @@ export function OnboardingGuide({ onComplete }: OnboardingGuideProps) {
     setNodeResult({ status: 'loading', message: '检测中...' })
     try {
       const node = await checkNodeVersion()
-      if (node.installed && node.meets_minimum) {
+      if (node.installed && node.meetsMinimum) {
         setNodeResult({ status: 'success', message: `Node.js ${node.version} 已安装` })
       } else if (node.installed) {
         setNodeResult({ status: 'warning', message: `Node.js ${node.version} 版本过低` })
@@ -176,10 +176,15 @@ export function OnboardingGuide({ onComplete }: OnboardingGuideProps) {
         ),
       ]}
     >
-      <Steps current={currentStep} size="small" style={{ marginBottom: 24 }}>
-        <Step title="检测环境" icon={<CloudServerOutlined />} />
-        <Step title="完成" icon={<CheckCircleOutlined />} />
-      </Steps>
+      <Steps
+        current={currentStep}
+        size="small"
+        style={{ marginBottom: 24 }}
+        items={[
+          { title: '检测环境', icon: <CloudServerOutlined /> },
+          { title: '完成', icon: <CheckCircleOutlined /> },
+        ]}
+      />
 
       {currentStep === 0 && (
         <div>
