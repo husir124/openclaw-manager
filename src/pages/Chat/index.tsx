@@ -1,4 +1,9 @@
-// Chat 页面：管理聊天相关配置，聊天本身跳转到官方 Control UI
+/**
+ * 聊天页面
+ *
+ * OpenClaw Manager 专注于配置和管理，聊天功能通过跳转到
+ * 官方 Control UI 实现（Gateway 协议过于复杂，不适合在 Manager 中重新实现）。
+ */
 import { Card, Typography, Button, Space, Alert } from 'antd'
 import { MessageOutlined, LinkOutlined, ApiOutlined } from '@ant-design/icons'
 
@@ -10,20 +15,18 @@ export default function ChatPage() {
   return (
     <div style={{ maxWidth: 700, margin: '0 auto' }}>
       <Title level={3}>
-        <MessageOutlined /> Chat
+        <MessageOutlined /> 聊天
       </Title>
       <Paragraph type="secondary">
-        OpenClaw Manager focuses on configuration and management.
-        For chatting with your AI assistant, use the official Control UI.
+        OpenClaw Manager 专注于配置和管理。与 AI 助手聊天，请使用官方 Control UI。
       </Paragraph>
 
       <Card style={{ marginTop: 24 }}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>
-            <Title level={5}><ApiOutlined /> Official Control UI</Title>
+            <Title level={5}><ApiOutlined /> 官方 Control UI</Title>
             <Paragraph>
-              The official Control UI provides full chat functionality including
-              streaming responses, tool call visualization, and session management.
+              官方 Control UI 提供完整的聊天功能，包括流式响应、工具调用可视化和会话管理。
             </Paragraph>
             <Button
               type="primary"
@@ -31,25 +34,25 @@ export default function ChatPage() {
               size="large"
               onClick={() => window.open(gatewayUrl, '_blank')}
             >
-              Open Control UI ({gatewayUrl})
+              打开 Control UI ({gatewayUrl})
             </Button>
           </div>
 
           <Alert
             type="info"
-            message="Why a separate Control UI?"
-            description="OpenClaw Gateway uses a complex WebSocket protocol with device identity signing, challenge-response handshake, and protocol version negotiation. Rather than reimplementing this, OpenClaw Manager focuses on what it does best: making setup, configuration, and management easy."
+            message="为什么要跳转到 Control UI？"
+            description="OpenClaw Gateway 使用复杂的 WebSocket 协议，包括设备身份签名、挑战-响应握手和协议版本协商。与其重新实现，OpenClaw Manager 专注于自己擅长的事情：让安装、配置和管理变得简单。"
             showIcon
           />
 
           <div>
-            <Title level={5}>What OpenClaw Manager provides</Title>
+            <Title level={5}>OpenClaw Manager 提供的功能</Title>
             <ul>
-              <li><strong>Setup Wizard</strong> - Detect Node.js, install OpenClaw, start Gateway</li>
-              <li><strong>Config Editor</strong> - Visual editor for openclaw.json</li>
-              <li><strong>Agent Manager</strong> - Create and manage AI agents</li>
-              <li><strong>Health Monitor</strong> - Diagnostics and auto-repair</li>
-              <li><strong>Backup & Restore</strong> - Encrypted config backups</li>
+              <li><strong>环境检测</strong> — 检测 Node.js、安装 OpenClaw、启动 Gateway</li>
+              <li><strong>配置编辑</strong> — 可视化编辑 openclaw.json</li>
+              <li><strong>Agent 管理</strong> — 创建和管理 AI Agent</li>
+              <li><strong>健康监控</strong> — 系统诊断和自动修复</li>
+              <li><strong>备份恢复</strong> — 加密配置备份</li>
             </ul>
           </div>
         </Space>

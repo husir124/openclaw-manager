@@ -58,7 +58,7 @@ export default function ConfigPage() {
     return (
       <div style={{ textAlign: 'center', padding: 60 }}>
         <Spin size="large" />
-        <div style={{ marginTop: 16 }}>Loading config...</div>
+        <div style={{ marginTop: 16 }}>加载配置...</div>
       </div>
     )
   }
@@ -66,9 +66,9 @@ export default function ConfigPage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}><CodeOutlined /> Config</Title>
+        <Title level={3} style={{ margin: 0 }}><CodeOutlined /> 配置</Title>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadConfig}>Reload</Button>
+          <Button icon={<ReloadOutlined />} onClick={loadConfig}>刷新</Button>
           <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
             Save
           </Button>
@@ -85,7 +85,7 @@ export default function ConfigPage() {
         items={[
           {
             key: 'sections',
-            label: <span><AppstoreOutlined /> Sections</span>,
+            label: <span><AppstoreOutlined /> 配置段</span>,
             children: (
               <div>
                 <Paragraph type="secondary">
@@ -127,7 +127,7 @@ export default function ConfigPage() {
           },
           {
             key: 'raw',
-            label: <span><CodeOutlined /> Raw JSON</span>,
+            label: <span><CodeOutlined /> 原始 JSON</span>,
             children: (
               <div>
                 <Paragraph type="secondary">
@@ -145,14 +145,14 @@ export default function ConfigPage() {
           },
           {
             key: 'backups',
-            label: <span><HistoryOutlined /> Backups ({backups.length})</span>,
+            label: <span><HistoryOutlined /> 备份 ({backups.length})</span>,
             children: (
               <div>
                 <Paragraph type="secondary">
                   Automatic backups created before each config change.
                 </Paragraph>
                 {backups.length === 0 ? (
-                  <Text type="secondary">No backups yet</Text>
+                  <Text type="secondary">暂无备份</Text>
                 ) : (
                   <List
                     size="small"
