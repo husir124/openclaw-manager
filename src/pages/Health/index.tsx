@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Space, Tag, Button, Alert, Divider, List, Progress, Modal, Input } from 'antd'
+import { Typography, Card, Spin, Space, Tag, Button, Alert, Divider, List, Progress, Modal, Input, Tooltip } from 'antd'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -39,7 +39,7 @@ export default function HealthPage() {
   const [logLines, setLogLines] = useState(50)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [refreshInterval, setRefreshInterval] = useState(30) // 秒
+  const [refreshInterval, setRefreshInterval] = useState(60) // 秒（默认 1 分钟）
 
   const runDiagnosis = async () => {
     setLoading(true)
@@ -208,13 +208,15 @@ export default function HealthPage() {
               最后更新: {lastUpdate.toLocaleTimeString()}
             </Text>
           )}
-          <Button
-            size="small"
-            type={autoRefresh ? 'primary' : 'default'}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-          >
-            {autoRefresh ? '自动刷新: 开' : '自动刷新: 关'}
-          </Button>
+          <Tooltip title={autoRefresh ? `每 ${refreshInterval} 秒自动刷新一次诊断，点击关闭自动刷新` : '自动刷新已关闭，点击开启'}>
+            <Button
+              size="small"
+              type={autoRefresh ? 'primary' : 'default'}
+              onClick={() => setAutoRefresh(!autoRefresh)}
+            >
+              {autoRefresh ? `自动刷新 (${refreshInterval}s)` : '自动刷新: 关'}
+            </Button>
+          </Tooltip>
           <Button icon={<SyncOutlined />} onClick={runDiagnosis} loading={loading}>
             刷新
           </Button>

@@ -68,7 +68,7 @@ export default function MainLayout() {
 
   useEffect(() => {
     refreshGatewayStatus()
-    const timer = setInterval(refreshGatewayStatus, 30000)
+    const timer = setInterval(refreshGatewayStatus, 60000) // 60 秒
     return () => clearInterval(timer)
   }, [refreshGatewayStatus])
 
