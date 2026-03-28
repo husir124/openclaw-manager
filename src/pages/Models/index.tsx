@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Divider, Table, Tooltip, Select, Tabs } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Table, Tooltip, Select, Tabs, Collapse, message } from 'antd'
 import {
   CloudServerOutlined,
   PlusOutlined,
@@ -7,96 +7,68 @@ import {
   EditOutlined,
   DeleteOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
-  QuestionCircleOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   ExperimentOutlined,
   KeyOutlined,
-  ApiOutlined,
-  SettingOutlined,
+  RobotOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons'
 import { readConfig, writeConfig } from '../../services/tauri'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { Password } = Input
+const { Panel } = Collapse
 
-// Provider 配置
+// Provider + 模型
+interface ModelInfo {
+  id: string
+  name: string
+  reasoning: boolean
+  contextWindow: number
+  maxTokens: number
+}
+
 interface Provider {
   id: string
   name: string
   baseUrl: string
   apiKey: string
   api: string
-  models: Model[]
-  input?: string[]
-  cost?: {
-    input: number
-    output: number
-    cacheRead: number
-    cacheWrite: number
-  }
+  models: ModelInfo[]
 }
 
-interface Model {
+// Agent 模型配置
+interface AgentModelConfig {
   id: string
   name: string
-  reasoning: boolean
-  contextWindow: number
-  maxTokens: number
-  input?: string[]
-  cost?: {
-    input: number
-    output: number
-    cacheRead: number
-    cacheWrite: number
-  }
-}
-
-// 模型别名
-interface ModelAlias {
-  modelId: string
-  alias: string
-}
-
-// Auth Profile
-interface AuthProfile {
-  provider: string
-  mode: string
-}
-
-// 全局模型配置
-interface GlobalModelConfig {
-  mode: string
-  workspace: string
-  compaction: { mode: string }
-  maxConcurrent: number
-  subagents: { maxConcurrent: number }
+  primary: string
+  fallbacks: string[]
 }
 
 export default function ModelsPage() {
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState<Provider[]>([])
-  const [modelAliases, setModelAliases] = useState<ModelAlias[]>([])
-  const [authProfiles, setAuthProfiles] = useState<Record<string, AuthProfile>>({})
-  const [globalConfig, setGlobalConfig] = useState<GlobalModelConfig | null>(null)
+  const [agents, setAgents] = useState<AgentModelConfig[]>([])
+  const [defaultPrimary, setDefaultPrimary] = useState('')
+  const [defaultFallbacks, setDefaultFallbacks] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // 模态框状态
+  // 模态框
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null)
   const [showAddModel, setShowAddModel] = useState(false)
-  const [targetProviderId, setTargetProviderId] = useState<string>('')
+  const [targetProviderId, setTargetProviderId] = useState('')
 
-  // 表单状态
+  // Provider 表单
   const [formProviderId, setFormProviderId] = useState('')
   const [formProviderName, setFormProviderName] = useState('')
   const [formBaseUrl, setFormBaseUrl] = useState('')
   const [formApiKey, setFormApiKey] = useState('')
   const [formApi, setFormApi] = useState('openai-completions')
 
-  // 模型表单
+  // Model 表单
   const [formModelId, setFormModelId] = useState('')
   const [formModelName, setFormModelName] = useState('')
   const [formContextWindow, setFormContextWindow] = useState('128000')
@@ -104,6 +76,14 @@ export default function ModelsPage() {
 
   // 测试状态
   const [testingProvider, setTestingProvider] = useState<string | null>(null)
+
+  // 构建可用模型列表（格式：provider/modelId）
+  const allModelOptions = providers.flatMap(p =>
+    p.models.map(m => ({
+      label: `${p.name} / ${m.name}`,
+      value: `${p.id}/${m.id}`,
+    }))
+  )
 
   const loadConfig = async () => {
     setLoading(true)
@@ -113,64 +93,46 @@ export default function ModelsPage() {
       const parsed = config.parsed as Record<string, unknown>
       const modelsConfig = (parsed.models as Record<string, unknown>) || {}
       const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
-      const aliasesConfig = (modelsConfig.models as Record<string, unknown>) || {}
-      const authConfig = (parsed.auth as Record<string, unknown>) || {}
-      const authProfilesConfig = (authConfig.profiles as Record<string, unknown>) || {}
+      const agentsConfig = (parsed.agents as Record<string, unknown>) || {}
+      const defaultsConfig = (agentsConfig.defaults as Record<string, unknown>) || {}
+      const defaultsModel = (defaultsConfig.model as Record<string, unknown>) || {}
+      const agentsList = (agentsConfig.list as Array<Record<string, unknown>>) || []
 
       // 解析 providers
-      const providerList: Provider[] = Object.entries(providersConfig).map(([id, config]) => {
-        const cfg = config as Record<string, unknown>
-        const models = (cfg.models as Array<Record<string, unknown>>) || []
+      const providerList: Provider[] = Object.entries(providersConfig).map(([id, cfg]) => {
+        const c = cfg as Record<string, unknown>
+        const models = (c.models as Array<Record<string, unknown>>) || []
         return {
           id,
-          name: (cfg.name as string) || id,
-          baseUrl: (cfg.baseUrl as string) || '',
-          apiKey: (cfg.apiKey as string) || '',
-          api: (cfg.api as string) || 'openai-completions',
+          name: (c.name as string) || id,
+          baseUrl: (c.baseUrl as string) || '',
+          apiKey: (c.apiKey as string) || '',
+          api: (c.api as string) || 'openai-completions',
           models: models.map(m => ({
             id: m.id as string,
             name: (m.name as string) || (m.id as string),
             reasoning: (m.reasoning as boolean) || false,
             contextWindow: (m.contextWindow as number) || 128000,
             maxTokens: (m.maxTokens as number) || 4096,
-            input: m.input as string[],
-            cost: m.cost as Model['cost'],
           })),
         }
       })
 
-      // 解析 aliases
-      const aliasList: ModelAlias[] = Object.entries(aliasesConfig).map(([modelId, config]) => {
-        const cfg = config as Record<string, unknown>
+      // 解析 agent 模型配置
+      const agentModels: AgentModelConfig[] = agentsList.map(a => {
+        const model = (a.model as Record<string, unknown>) || {}
         return {
-          modelId,
-          alias: (cfg.alias as string) || '',
+          id: a.id as string,
+          name: (a.name as string) || (a.id as string),
+          primary: (model.primary as string) || '',
+          fallbacks: (model.fallbacks as string[]) || [],
         }
       })
 
-      // 解析 auth profiles
-      const profiles: Record<string, AuthProfile> = {}
-      for (const [key, value] of Object.entries(authProfilesConfig)) {
-        const v = value as Record<string, unknown>
-        profiles[key] = {
-          provider: v.provider as string,
-          mode: v.mode as string,
-        }
-      }
-
-      // 解析全局配置
-      const global: GlobalModelConfig = {
-        mode: (modelsConfig.mode as string) || 'merge',
-        workspace: (modelsConfig.workspace as string) || '',
-        compaction: (modelsConfig.compaction as Record<string, unknown>) as GlobalModelConfig['compaction'] || { mode: 'safeguard' },
-        maxConcurrent: (modelsConfig.maxConcurrent as number) || 4,
-        subagents: (modelsConfig.subagents as Record<string, unknown>) as GlobalModelConfig['subagents'] || { maxConcurrent: 8 },
-      }
-
       setProviders(providerList)
-      setModelAliases(aliasList)
-      setAuthProfiles(profiles)
-      setGlobalConfig(global)
+      setAgents(agentModels)
+      setDefaultPrimary((defaultsModel.primary as string) || '')
+      setDefaultFallbacks((defaultsModel.fallbacks as string[]) || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载配置失败')
     } finally {
@@ -180,7 +142,8 @@ export default function ModelsPage() {
 
   useEffect(() => { loadConfig() }, [])
 
-  // 重置表单
+  // ========== Provider 操作 ==========
+
   const resetProviderForm = () => {
     setFormProviderId('')
     setFormProviderName('')
@@ -190,18 +153,8 @@ export default function ModelsPage() {
     setEditingProvider(null)
   }
 
-  const resetModelForm = () => {
-    setFormModelId('')
-    setFormModelName('')
-    setFormContextWindow('128000')
-    setFormMaxTokens('4096')
-    setTargetProviderId('')
-  }
-
-  // 添加/编辑 Provider
   const handleSaveProvider = async () => {
     if (!formProviderId || !formBaseUrl) return
-
     try {
       const config = await readConfig()
       const parsed = config.parsed as Record<string, unknown>
@@ -210,12 +163,13 @@ export default function ModelsPage() {
 
       if (editingProvider) {
         const existing = providersConfig[editingProvider.id] as Record<string, unknown>
+        const existingModels = (existing.models as Array<Record<string, unknown>>) || []
         providersConfig[formProviderId] = {
-          ...existing,
           baseUrl: formBaseUrl,
-          apiKey: formApiKey,
+          apiKey: formApiKey || existing.apiKey,
           api: formApi,
           name: formProviderName || formProviderId,
+          models: existingModels,
         }
         if (formProviderId !== editingProvider.id) {
           delete providersConfig[editingProvider.id]
@@ -236,7 +190,6 @@ export default function ModelsPage() {
 
       modelsConfig.providers = providersConfig
       parsed.models = modelsConfig
-
       await writeConfig(JSON.stringify(parsed, null, 2))
       setShowAddProvider(false)
       resetProviderForm()
@@ -247,18 +200,15 @@ export default function ModelsPage() {
     }
   }
 
-  // 删除 Provider
   const handleDeleteProvider = async (providerId: string) => {
     try {
       const config = await readConfig()
       const parsed = config.parsed as Record<string, unknown>
       const modelsConfig = (parsed.models as Record<string, unknown>) || {}
       const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
-
       delete providersConfig[providerId]
       modelsConfig.providers = providersConfig
       parsed.models = modelsConfig
-
       await writeConfig(JSON.stringify(parsed, null, 2))
       setSuccess(`Provider "${providerId}" 已删除`)
       await loadConfig()
@@ -267,21 +217,57 @@ export default function ModelsPage() {
     }
   }
 
-  // 添加模型
+  const handleEditProvider = (provider: Provider) => {
+    setEditingProvider(provider)
+    setFormProviderId(provider.id)
+    setFormProviderName(provider.name)
+    setFormBaseUrl(provider.baseUrl)
+    setFormApiKey('') // 不回显 API Key
+    setFormApi(provider.api)
+    setShowAddProvider(true)
+  }
+
+  const handleDeleteModel = async (providerId: string, modelId: string) => {
+    try {
+      const config = await readConfig()
+      const parsed = config.parsed as Record<string, unknown>
+      const modelsConfig = (parsed.models as Record<string, unknown>) || {}
+      const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
+      const provider = providersConfig[providerId] as Record<string, unknown>
+      if (provider) {
+        const models = (provider.models as Array<Record<string, unknown>>) || []
+        provider.models = models.filter(m => m.id !== modelId)
+        providersConfig[providerId] = provider
+        modelsConfig.providers = providersConfig
+        parsed.models = modelsConfig
+        await writeConfig(JSON.stringify(parsed, null, 2))
+        setSuccess(`模型 "${modelId}" 已删除`)
+        await loadConfig()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败')
+    }
+  }
+
+  // ========== 模型操作 ==========
+
+  const resetModelForm = () => {
+    setFormModelId('')
+    setFormModelName('')
+    setFormContextWindow('128000')
+    setFormMaxTokens('4096')
+    setTargetProviderId('')
+  }
+
   const handleAddModel = async () => {
     if (!targetProviderId || !formModelId) return
-
     try {
       const config = await readConfig()
       const parsed = config.parsed as Record<string, unknown>
       const modelsConfig = (parsed.models as Record<string, unknown>) || {}
       const providersConfig = (modelsConfig.providers as Record<string, unknown>) || {}
       const provider = providersConfig[targetProviderId] as Record<string, unknown>
-
-      if (!provider) {
-        setError('Provider 不存在')
-        return
-      }
+      if (!provider) { setError('Provider 不存在'); return }
 
       const models = (provider.models as Array<Record<string, unknown>>) || []
       if (models.some(m => m.id === formModelId)) {
@@ -303,7 +289,6 @@ export default function ModelsPage() {
       providersConfig[targetProviderId] = provider
       modelsConfig.providers = providersConfig
       parsed.models = modelsConfig
-
       await writeConfig(JSON.stringify(parsed, null, 2))
       setShowAddModel(false)
       resetModelForm()
@@ -314,17 +299,52 @@ export default function ModelsPage() {
     }
   }
 
-  // 测试 API 连通性
+  // ========== Agent 模型配置 ==========
+
+  const handleUpdateAgentModel = async (agentId: string, primary: string, fallbacks: string[]) => {
+    try {
+      const config = await readConfig()
+      const parsed = config.parsed as Record<string, unknown>
+      const agentsConfig = (parsed.agents as Record<string, unknown>) || {}
+
+      if (agentId === '__defaults__') {
+        // 更新全局默认
+        const defaults = (agentsConfig.defaults as Record<string, unknown>) || {}
+        const model = (defaults.model as Record<string, unknown>) || {}
+        model.primary = primary
+        model.fallbacks = fallbacks
+        defaults.model = model
+        agentsConfig.defaults = defaults
+      } else {
+        // 更新特定 agent
+        const agentsList = (agentsConfig.list as Array<Record<string, unknown>>) || []
+        const agent = agentsList.find(a => a.id === agentId)
+        if (agent) {
+          const model = (agent.model as Record<string, unknown>) || {}
+          model.primary = primary
+          model.fallbacks = fallbacks
+          agent.model = model
+        }
+      }
+
+      parsed.agents = agentsConfig
+      await writeConfig(JSON.stringify(parsed, null, 2))
+      setSuccess('Agent 模型配置已保存')
+      await loadConfig()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败')
+    }
+  }
+
+  // ========== 测试连通性 ==========
+
   const handleTestProvider = async (provider: Provider) => {
     setTestingProvider(provider.id)
     try {
       const response = await fetch(`${provider.baseUrl}/models`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${provider.apiKey}`,
-        },
+        headers: { 'Authorization': `Bearer ${provider.apiKey}` },
       })
-
       if (response.ok) {
         setSuccess(`${provider.name} 连通性测试成功`)
       } else {
@@ -337,99 +357,6 @@ export default function ModelsPage() {
     }
   }
 
-  // 编辑 Provider
-  const handleEditProvider = (provider: Provider) => {
-    setEditingProvider(provider)
-    setFormProviderId(provider.id)
-    setFormProviderName(provider.name)
-    setFormBaseUrl(provider.baseUrl)
-    setFormApiKey(provider.apiKey)
-    setFormApi(provider.api)
-    setShowAddProvider(true)
-  }
-
-  // Provider 表格列
-  const providerColumns = [
-    {
-      title: 'Provider',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string, record: Provider) => (
-        <Space>
-          <CloudServerOutlined />
-          <Text strong>{name}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Base URL',
-      dataIndex: 'baseUrl',
-      key: 'baseUrl',
-      render: (url: string) => (
-        <Text code style={{ fontSize: 12, maxWidth: 200, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {url}
-        </Text>
-      ),
-    },
-    {
-      title: 'API 类型',
-      dataIndex: 'api',
-      key: 'api',
-      render: (api: string) => <Tag>{api}</Tag>,
-    },
-    {
-      title: 'API Key',
-      dataIndex: 'apiKey',
-      key: 'apiKey',
-      render: (key: string) => (
-        <Space>
-          <KeyOutlined />
-          <Text>{key ? '••••••••' : '未配置'}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: '模型',
-      key: 'modelCount',
-      render: (_: unknown, record: Provider) => (
-        <Tag color="blue">{record.models.length} 个模型</Tag>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: unknown, record: Provider) => (
-        <Space>
-          <Tooltip title="测试连通性">
-            <Button
-              size="small"
-              icon={<ExperimentOutlined />}
-              loading={testingProvider === record.id}
-              onClick={() => handleTestProvider(record)}
-            >
-              测试
-            </Button>
-          </Tooltip>
-          <Tooltip title="编辑">
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditProvider(record)}
-            />
-          </Tooltip>
-          <Tooltip title="删除">
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDeleteProvider(record.id)}
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ]
-
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 60 }}>
@@ -439,224 +366,177 @@ export default function ModelsPage() {
     )
   }
 
-  // 统计信息
-  const totalModels = providers.reduce((sum, p) => sum + p.models.length, 0)
-  const totalAliases = modelAliases.length
-
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+      {/* 标题栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>
           <CloudServerOutlined /> 模型配置
         </Title>
         <Space>
-          <Tag color="blue">Providers: {providers.length}</Tag>
-          <Tag color="green">模型: {totalModels}</Tag>
-          <Tag color="orange">别名: {totalAliases}</Tag>
+          <Tag color="blue">{providers.length} 个 Provider</Tag>
+          <Tag color="green">{providers.reduce((s, p) => s + p.models.length, 0)} 个模型</Tag>
           <Button icon={<ReloadOutlined />} onClick={loadConfig}>刷新</Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => { resetProviderForm(); setShowAddProvider(true) }}
-          >
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetProviderForm(); setShowAddProvider(true) }}>
             添加 Provider
           </Button>
         </Space>
       </div>
 
-      {error && <Alert type="error" message={error} showIcon closable style={{ marginBottom: 16 }} />}
-      {success && <Alert type="success" message={success} showIcon closable style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} style={{ marginBottom: 16 }} />}
+      {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess(null)} style={{ marginBottom: 16 }} />}
 
       <Tabs
         defaultActiveKey="providers"
         items={[
+          // ========== Tab 1: Provider 列表 ==========
           {
             key: 'providers',
-            label: (
-              <Space>
-                <CloudServerOutlined />
-                Provider 列表
-              </Space>
-            ),
-            children: (
-              <Table
-                dataSource={providers}
-                columns={providerColumns}
-                rowKey="id"
-                pagination={false}
-                size="middle"
-                expandable={{
-                  expandedRowRender: (record) => (
-                    <div style={{ padding: '0 24px' }}>
-                      <Text strong>模型列表：</Text>
-                      <div style={{ marginTop: 8 }}>
-                        {record.models.length === 0 ? (
-                          <Text type="secondary">暂无模型</Text>
-                        ) : (
-                          <Space wrap>
-                            {record.models.map((model) => (
-                              <Card key={model.id} size="small" style={{ width: 280 }}>
-                                <div style={{ lineHeight: 2 }}>
-                                  <div><Text strong>{model.name}</Text></div>
-                                  <div><Text type="secondary">ID：</Text><Text code style={{ fontSize: 11 }}>{model.id}</Text></div>
-                                  <div><Text type="secondary">上下文：</Text><Tag>{(model.contextWindow / 1000).toFixed(0)}K</Tag></div>
-                                  <div><Text type="secondary">最大输出：</Text><Tag>{model.maxTokens}</Tag></div>
-                                  {model.reasoning && <div><Tag color="purple">推理模型</Tag></div>}
-                                  {model.input && <div><Text type="secondary">输入：</Text>{model.input.join(', ')}</div>}
-                                </div>
-                              </Card>
-                            ))}
-                          </Space>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                }}
-              />
-            ),
-          },
-          {
-            key: 'aliases',
-            label: (
-              <Space>
-                <SettingOutlined />
-                模型别名
-              </Space>
-            ),
-            children: (
-              <Table
-                dataSource={modelAliases}
-                columns={[
-                  {
-                    title: '模型 ID',
-                    dataIndex: 'modelId',
-                    key: 'modelId',
-                    render: (id: string) => <Text code>{id}</Text>,
-                  },
-                  {
-                    title: '别名',
-                    dataIndex: 'alias',
-                    key: 'alias',
-                    render: (alias: string) => alias ? <Tag color="blue">{alias}</Tag> : <Text type="secondary">无</Text>,
-                  },
-                ]}
-                rowKey="modelId"
-                pagination={false}
-                size="small"
-              />
-            ),
-          },
-          {
-            key: 'auth',
-            label: (
-              <Space>
-                <KeyOutlined />
-                认证配置
-              </Space>
-            ),
-            children: (
-              <Table
-                dataSource={Object.entries(authProfiles).map(([key, value]) => ({ key, ...value }))}
-                columns={[
-                  {
-                    title: 'Profile',
-                    dataIndex: 'key',
-                    key: 'key',
-                    render: (key: string) => <Text code>{key}</Text>,
-                  },
-                  {
-                    title: 'Provider',
-                    dataIndex: 'provider',
-                    key: 'provider',
-                    render: (provider: string) => <Tag>{provider}</Tag>,
-                  },
-                  {
-                    title: '认证模式',
-                    dataIndex: 'mode',
-                    key: 'mode',
-                    render: (mode: string) => <Tag color="green">{mode}</Tag>,
-                  },
-                ]}
-                rowKey="key"
-                pagination={false}
-                size="small"
-              />
-            ),
-          },
-          {
-            key: 'global',
-            label: (
-              <Space>
-                <ApiOutlined />
-                全局配置
-              </Space>
-            ),
-            children: globalConfig && (
-              <Card size="small">
-                <div style={{ lineHeight: 2.5 }}>
-                  <div><Text type="secondary">模式：</Text><Tag>{globalConfig.mode}</Tag></div>
-                  <div><Text type="secondary">工作区：</Text><Text code>{globalConfig.workspace}</Text></div>
-                  <div><Text type="secondary">压缩模式：</Text><Tag>{globalConfig.compaction.mode}</Tag></div>
-                  <div><Text type="secondary">最大并发：</Text><Tag>{globalConfig.maxConcurrent}</Tag></div>
-                  <div><Text type="secondary">子代理最大并发：</Text><Tag>{globalConfig.subagents.maxConcurrent}</Tag></div>
+            label: <Space><CloudServerOutlined />Provider 列表</Space>,
+            children: providers.length === 0 ? (
+              <Card>
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <CloudServerOutlined style={{ fontSize: 48, color: '#ccc' }} />
+                  <div style={{ marginTop: 16, color: '#999' }}>暂无 Provider，请先添加</div>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetProviderForm(); setShowAddProvider(true) }} style={{ marginTop: 16 }}>
+                    添加 Provider
+                  </Button>
                 </div>
               </Card>
+            ) : (
+              <Collapse>
+                {providers.map(provider => (
+                  <Panel
+                    key={provider.id}
+                    header={
+                      <Space>
+                        <CloudServerOutlined />
+                        <Text strong>{provider.name}</Text>
+                        <Tag>{provider.api}</Tag>
+                        <Tag color="blue">{provider.models.length} 个模型</Tag>
+                        <Text code style={{ fontSize: 12 }}>{provider.baseUrl}</Text>
+                      </Space>
+                    }
+                    extra={
+                      <Space onClick={e => e.stopPropagation()}>
+                        <Tooltip title="测试连通性">
+                          <Button size="small" icon={<ExperimentOutlined />}
+                            loading={testingProvider === provider.id}
+                            onClick={() => handleTestProvider(provider)} />
+                        </Tooltip>
+                        <Tooltip title="编辑">
+                          <Button size="small" icon={<EditOutlined />}
+                            onClick={() => handleEditProvider(provider)} />
+                        </Tooltip>
+                        <Tooltip title="删除">
+                          <Button size="small" danger icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteProvider(provider.id)} />
+                        </Tooltip>
+                      </Space>
+                    }
+                  >
+                    <div style={{ marginBottom: 12 }}>
+                      <Space>
+                        <KeyOutlined />
+                        <Text type="secondary">API Key：</Text>
+                        <Text>{provider.apiKey ? '••••••••••••' : <Text type="warning">未配置</Text>}</Text>
+                      </Space>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text strong>模型列表</Text>
+                      <Button size="small" type="link" icon={<PlusOutlined />}
+                        onClick={() => { setTargetProviderId(provider.id); setShowAddModel(true) }}>
+                        添加模型
+                      </Button>
+                    </div>
+
+                    {provider.models.length === 0 ? (
+                      <Text type="secondary">暂无模型，请先添加</Text>
+                    ) : (
+                      <Table
+                        dataSource={provider.models}
+                        rowKey="id"
+                        size="small"
+                        pagination={false}
+                        columns={[
+                          { title: '模型 ID', dataIndex: 'id', key: 'id', render: (id: string) => <Text code>{id}</Text> },
+                          { title: '显示名称', dataIndex: 'name', key: 'name' },
+                          { title: '上下文窗口', dataIndex: 'contextWindow', key: 'cw', render: (v: number) => <Tag>{(v / 1000).toFixed(0)}K</Tag> },
+                          { title: '最大输出', dataIndex: 'maxTokens', key: 'mt', render: (v: number) => <Tag>{v}</Tag> },
+                          {
+                            title: '操作', key: 'action',
+                            render: (_: unknown, record: ModelInfo) => (
+                              <Button size="small" danger onClick={() => handleDeleteModel(provider.id, record.id)}>
+                                删除
+                              </Button>
+                            ),
+                          },
+                        ]}
+                      />
+                    )}
+                  </Panel>
+                ))}
+              </Collapse>
+            )
+          },
+
+          // ========== Tab 2: Agent 模型配置 ==========
+          {
+            key: 'agents',
+            label: <Space><RobotOutlined />Agent 模型配置</Space>,
+            children: (
+              <Space direction="vertical" style={{ width: '100%' }} size="large">
+                {/* 全局默认 */}
+                <Card size="small" title="全局默认模型">
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text>主模型</Text>
+                      <Select
+                        value={defaultPrimary}
+                        onChange={(v) => setDefaultPrimary(v)}
+                        options={allModelOptions}
+                        placeholder="选择主模型"
+                        style={{ width: 350 }}
+                        showSearch
+                        optionFilterProp="label"
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text>Fallback 模型</Text>
+                      <Select
+                        mode="multiple"
+                        value={defaultFallbacks}
+                        onChange={(v) => setDefaultFallbacks(v)}
+                        options={allModelOptions}
+                        placeholder="选择 fallback 模型"
+                        style={{ width: 350 }}
+                        showSearch
+                        optionFilterProp="label"
+                      />
+                    </div>
+                    <Button type="primary" onClick={() => handleUpdateAgentModel('__defaults__', defaultPrimary, defaultFallbacks)}>
+                      保存全局默认
+                    </Button>
+                  </Space>
+                </Card>
+
+                {/* 各 Agent 配置 */}
+                {agents.map(agent => (
+                  <AgentModelCard
+                    key={agent.id}
+                    agent={agent}
+                    modelOptions={allModelOptions}
+                    onSave={(primary, fallbacks) => handleUpdateAgentModel(agent.id, primary, fallbacks)}
+                  />
+                ))}
+              </Space>
             ),
           },
         ]}
       />
 
-      {/* 快速添加模型 */}
-      <Card
-        title="快速添加模型"
-        size="small"
-        style={{ marginTop: 16 }}
-        extra={
-          <Button
-            type="link"
-            icon={<PlusOutlined />}
-            onClick={() => setShowAddModel(true)}
-          >
-            添加到 Provider
-          </Button>
-        }
-      >
-        <Text type="secondary">
-          点击「添加到 Provider」可以为指定 Provider 添加新的模型。
-        </Text>
-      </Card>
-
-      {/* 使用说明 */}
-      <Card title="使用说明" size="small" style={{ marginTop: 16 }}>
-        <div style={{ lineHeight: 2 }}>
-          <div>
-            <Space>
-              <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>Provider 是 AI 模型的提供商，如 OpenAI、Anthropic、或自定义 API</Text>
-            </Space>
-          </div>
-          <div>
-            <Space>
-              <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>每个 Provider 可以配置多个模型，Agent 可以选择使用哪个模型</Text>
-            </Space>
-          </div>
-          <div>
-            <Space>
-              <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>模型别名用于简化模型 ID 的引用</Text>
-            </Space>
-          </div>
-          <div>
-            <Space>
-              <QuestionCircleOutlined style={{ color: '#999' }} />
-              <Text>API Key 使用密码输入框保护，不会明文显示</Text>
-            </Space>
-          </div>
-        </div>
-      </Card>
-
-      {/* 添加/编辑 Provider 模态框 */}
+      {/* ========== 添加/编辑 Provider 模态框 ========== */}
       <Modal
         title={editingProvider ? '编辑 Provider' : '添加 Provider'}
         open={showAddProvider}
@@ -666,87 +546,41 @@ export default function ModelsPage() {
         cancelText="取消"
         okButtonProps={{ disabled: !formProviderId || !formBaseUrl }}
       >
-        <Space orientation="vertical" style={{ width: '100%' }} size="large">
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <div>
-            <Space>
-              <Text>Provider ID</Text>
-              <Tooltip title="Provider 的唯一标识符，只能包含小写字母、数字和连字符">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              value={formProviderId}
-              onChange={(e) => setFormProviderId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-              placeholder="my-provider"
-              disabled={!!editingProvider}
-              style={{ marginTop: 4 }}
-            />
+            <Text>Provider ID</Text>
+            <Input value={formProviderId}
+              onChange={e => setFormProviderId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              placeholder="my-provider" disabled={!!editingProvider} style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>显示名称</Text>
-              <Tooltip title="Provider 的显示名称，用于界面展示">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              value={formProviderName}
-              onChange={(e) => setFormProviderName(e.target.value)}
-              placeholder="My Provider"
-              style={{ marginTop: 4 }}
-            />
+            <Text>显示名称</Text>
+            <Input value={formProviderName} onChange={e => setFormProviderName(e.target.value)}
+              placeholder="My Provider" style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>Base URL <Text type="danger">*</Text></Text>
-              <Tooltip title="API 的基础 URL，如 https://api.openai.com/v1">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              value={formBaseUrl}
-              onChange={(e) => setFormBaseUrl(e.target.value)}
-              placeholder="https://api.example.com/v1"
-              style={{ marginTop: 4 }}
-            />
+            <Text>Base URL <Text type="danger">*</Text></Text>
+            <Input value={formBaseUrl} onChange={e => setFormBaseUrl(e.target.value)}
+              placeholder="https://api.example.com/v1" style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>API Key</Text>
-              <Tooltip title="API 密钥，用于身份验证">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Password
-              value={formApiKey}
-              onChange={(e) => setFormApiKey(e.target.value)}
-              placeholder="sk-xxxxxxxxxxxxxxxx"
-              iconRender={(visible) => (visible ? <EyeOutlined /> : <EyeInvisibleOutlined />)}
-              style={{ marginTop: 4 }}
-            />
+            <Text>API Key</Text>
+            <Password value={formApiKey} onChange={e => setFormApiKey(e.target.value)}
+              placeholder={editingProvider ? '留空保持不变' : 'sk-xxxxxxxx'} style={{ marginTop: 4 }}
+              iconRender={v => v ? <EyeOutlined /> : <EyeInvisibleOutlined />} />
           </div>
           <div>
-            <Space>
-              <Text>API 类型</Text>
-              <Tooltip title="API 的协议类型">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Select
-              value={formApi}
-              onChange={setFormApi}
+            <Text>API 类型</Text>
+            <Select value={formApi} onChange={setFormApi} style={{ width: '100%', marginTop: 4 }}
               options={[
                 { label: 'OpenAI Completions', value: 'openai-completions' },
-                { label: 'OpenAI Responses', value: 'openai-responses' },
                 { label: 'Anthropic', value: 'anthropic' },
-              ]}
-              style={{ width: '100%', marginTop: 4 }}
-            />
+              ]} />
           </div>
         </Space>
       </Modal>
 
-      {/* 添加模型模态框 */}
+      {/* ========== 添加模型模态框 ========== */}
       <Modal
         title="添加模型"
         open={showAddModel}
@@ -756,82 +590,111 @@ export default function ModelsPage() {
         cancelText="取消"
         okButtonProps={{ disabled: !targetProviderId || !formModelId }}
       >
-        <Space orientation="vertical" style={{ width: '100%' }} size="large">
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <div>
-            <Space>
-              <Text>选择 Provider <Text type="danger">*</Text></Text>
-              <Tooltip title="选择要添加模型的 Provider">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Select
-              value={targetProviderId}
-              onChange={setTargetProviderId}
-              placeholder="选择 Provider"
+            <Text>选择 Provider <Text type="danger">*</Text></Text>
+            <Select value={targetProviderId} onChange={setTargetProviderId} placeholder="选择 Provider"
               options={providers.map(p => ({ label: p.name, value: p.id }))}
-              style={{ width: '100%', marginTop: 4 }}
-            />
+              style={{ width: '100%', marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>模型 ID <Text type="danger">*</Text></Text>
-              <Tooltip title="模型的唯一标识符">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              value={formModelId}
-              onChange={(e) => setFormModelId(e.target.value)}
-              placeholder="gpt-4"
-              style={{ marginTop: 4 }}
-            />
+            <Text>模型 ID <Text type="danger">*</Text></Text>
+            <Input value={formModelId} onChange={e => setFormModelId(e.target.value)}
+              placeholder="gpt-4o" style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>显示名称</Text>
-              <Tooltip title="模型的显示名称">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              value={formModelName}
-              onChange={(e) => setFormModelName(e.target.value)}
-              placeholder="GPT-4"
-              style={{ marginTop: 4 }}
-            />
+            <Text>显示名称</Text>
+            <Input value={formModelName} onChange={e => setFormModelName(e.target.value)}
+              placeholder="GPT-4o" style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>上下文窗口</Text>
-              <Tooltip title="模型支持的最大上下文长度（token 数）">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              type="number"
-              value={formContextWindow}
-              onChange={(e) => setFormContextWindow(e.target.value)}
-              placeholder="128000"
-              style={{ marginTop: 4 }}
-            />
+            <Text>上下文窗口</Text>
+            <Input type="number" value={formContextWindow} onChange={e => setFormContextWindow(e.target.value)}
+              placeholder="128000" style={{ marginTop: 4 }} />
           </div>
           <div>
-            <Space>
-              <Text>最大输出 Token</Text>
-              <Tooltip title="模型单次输出的最大 token 数">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Input
-              type="number"
-              value={formMaxTokens}
-              onChange={(e) => setFormMaxTokens(e.target.value)}
-              placeholder="4096"
-              style={{ marginTop: 4 }}
-            />
+            <Text>最大输出 Token</Text>
+            <Input type="number" value={formMaxTokens} onChange={e => setFormMaxTokens(e.target.value)}
+              placeholder="4096" style={{ marginTop: 4 }} />
           </div>
         </Space>
       </Modal>
     </div>
+  )
+}
+
+// ========== Agent 模型配置卡片 ==========
+
+interface AgentModelCardProps {
+  agent: AgentModelConfig
+  modelOptions: Array<{ label: string; value: string }>
+  onSave: (primary: string, fallbacks: string[]) => void
+}
+
+function AgentModelCard({ agent, modelOptions, onSave }: AgentModelCardProps) {
+  const [primary, setPrimary] = useState(agent.primary)
+  const [fallbacks, setFallbacks] = useState<string[]>(agent.fallbacks)
+
+  // 同步外部数据
+  useEffect(() => {
+    setPrimary(agent.primary)
+    setFallbacks(agent.fallbacks)
+  }, [agent.primary, agent.fallbacks])
+
+  const changed = primary !== agent.primary || JSON.stringify(fallbacks) !== JSON.stringify(agent.fallbacks)
+
+  return (
+    <Card
+      size="small"
+      title={
+        <Space>
+          <RobotOutlined />
+          <Text strong>{agent.name}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>({agent.id})</Text>
+        </Space>
+      }
+      extra={changed ? <Tag color="orange">未保存</Tag> : null}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Space>
+            <Text>主模型</Text>
+            <Tooltip title="Agent 使用的主要模型">
+              <QuestionCircleOutlined style={{ color: '#999' }} />
+            </Tooltip>
+          </Space>
+          <Select
+            value={primary}
+            onChange={setPrimary}
+            options={modelOptions}
+            placeholder="选择主模型"
+            style={{ width: 350 }}
+            showSearch
+            optionFilterProp="label"
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Space>
+            <Text>Fallback</Text>
+            <Tooltip title="主模型不可用时的备选模型">
+              <QuestionCircleOutlined style={{ color: '#999' }} />
+            </Tooltip>
+          </Space>
+          <Select
+            mode="multiple"
+            value={fallbacks}
+            onChange={setFallbacks}
+            options={modelOptions}
+            placeholder="选择 fallback 模型"
+            style={{ width: 350 }}
+            showSearch
+            optionFilterProp="label"
+          />
+        </div>
+        <Button type="primary" size="small" onClick={() => onSave(primary, fallbacks)}>
+          保存
+        </Button>
+      </Space>
+    </Card>
   )
 }
