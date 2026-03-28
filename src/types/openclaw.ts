@@ -1,3 +1,10 @@
+/**
+ * OpenClaw 核心类型定义
+ *
+ * 与 Rust 后端的 AppError、系统信息等对应。
+ * 前端通过 Tauri IPC 接收这些类型的数据。
+ */
+
 export interface NodeInfo {
   installed: boolean
   version: string | null

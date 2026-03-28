@@ -1,3 +1,14 @@
+/**
+ * 仪表盘页面
+ *
+ * 显示 OpenClaw 运行状态概览：
+ * - Gateway 状态（运行中/已停止）
+ * - Agent 数量、渠道数量
+ * - Node.js / OpenClaw 版本
+ * - 快捷操作入口
+ *
+ * 数据来源：checkGatewayStatus() + readConfig()
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Space, Tag, Statistic, Row, Col, Button, Alert } from 'antd'
 import {

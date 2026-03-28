@@ -1,4 +1,21 @@
-// Gateway WebSocket 单例
+/**
+ * Gateway WebSocket 服务（单例模式）
+ *
+ * 连接 OpenClaw Gateway 的 WebSocket 服务，提供：
+ * - 请求/响应模式（类似 JSON-RPC）
+ * - 事件订阅（Gateway 推送的实时事件）
+ * - 心跳保活（30 秒间隔）
+ * - 并发控制（最多 10 个并发请求）
+ * - 请求队列（超出并发的请求排队等待）
+ * - 超时处理（10 秒超时自动拒绝）
+ *
+ * 使用方式：
+ * ```ts
+ * import { gatewayService } from './gateway'
+ * await gatewayService.connect(token)
+ * const result = await gatewayService.request('sessions.list')
+ * ```
+ */
 import { invoke } from '@tauri-apps/api/core'
 
 // Gateway 配置

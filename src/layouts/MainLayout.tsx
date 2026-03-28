@@ -1,3 +1,16 @@
+/**
+ * 主布局组件
+ *
+ * 应用的整体框架：左侧导航 (Sider) + 顶部 Header + 内容区 (Outlet)
+ *
+ * 功能：
+ * - 左侧菜单：11 个页面的导航
+ * - Header：应用标题 + Gateway 状态标签（60 秒自动刷新）
+ * - OnboardingGuide：首次使用引导弹窗
+ * - 主题适配：通过 useTheme() 响应暗色/浅色主题切换
+ *
+ * 所有子页面通过 <Outlet /> 渲染在内容区
+ */
 import { useState, useEffect, useCallback } from 'react'
 import { Layout, Menu, Tag, Space } from 'antd'
 import {

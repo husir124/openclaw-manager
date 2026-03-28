@@ -1,3 +1,23 @@
+/**
+ * 应用路由配置
+ *
+ * 所有页面嵌套在 MainLayout 中（左侧导航 + 顶部 Header + 内容区）。
+ * ErrorBoundary 捕获渲染错误，防止整个应用白屏。
+ *
+ * 路由表：
+ * / → 重定向到 /dashboard
+ * /setup     - 环境检测
+ * /dashboard - 仪表盘
+ * /chat      - 聊天（跳转官方 Control UI）
+ * /models    - 模型配置
+ * /channels  - 渠道配置
+ * /agents    - Agent 管理
+ * /skills    - Skill 市场
+ * /health    - 健康监控
+ * /backup    - 备份恢复
+ * /config    - 配置编辑
+ * /settings  - 设置
+ */
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import MainLayout from './layouts/MainLayout'

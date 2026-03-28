@@ -1,3 +1,13 @@
+//! 跨平台路径和命令封装
+//!
+//! 封装了 Windows/macOS/Linux 之间的路径差异：
+//! - 配置目录：~/.openclaw（所有平台统一）
+//! - npm 全局路径：%APPDATA%\npm vs /usr/local/bin
+//! - 可执行文件名：openclaw.cmd vs openclaw
+//! - 系统命令：where vs which
+//!
+//! 所有模块应通过此模块获取路径，禁止硬编码。
+
 use std::path::PathBuf;
 use std::process::Command;
 

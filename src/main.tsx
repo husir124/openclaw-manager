@@ -1,3 +1,13 @@
+/**
+ * OpenClaw Manager - 前端入口
+ *
+ * 渲染层次：React.StrictMode → BrowserRouter → ThemeProvider → ConfigProvider → App
+ *
+ * 主题切换原理：
+ * - ThemeProvider 管理 isDark 状态（light/dark/system）
+ * - ConfigProvider 通过 key={String(isDark)} 强制重建，确保 antd 暗色算法完全生效
+ * - 所有组件通过 useTheme() hook 读取当前主题
+ */
 import React, { useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

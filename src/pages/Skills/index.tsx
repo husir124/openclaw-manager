@@ -1,3 +1,13 @@
+/**
+ * Skill 市场页面
+ *
+ * 两个 Tab：
+ * 1. 本地已安装：读取每个 Agent workspace 下的 skills/ 目录
+ * 2. ClawHub 热门：预留（待 ClawHub 平台上线）
+ *
+ * Skill 检测逻辑：扫描 workspace/skills/ 目录，检查是否有 SKILL.md
+ * 支持删除 skill（需确认弹窗）
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Button, Space, Tag, Alert, Empty, Tooltip, Divider, Tabs, Modal, Select, Input, Badge, Popconfirm } from 'antd'
 import {

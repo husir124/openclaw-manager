@@ -1,3 +1,19 @@
+/**
+ * 渠道配置页面
+ *
+ * 显示 OpenClaw 支持的所有消息渠道，按类别分组：
+ * - 即时通讯：WhatsApp、Telegram、Signal、Discord 等
+ * - 企业协作：Slack、飞书、Microsoft Teams 等
+ * - 社交平台：Twitch、Nostr 等
+ * - 协议/其他：IRC、Matrix、Mattermost 等
+ *
+ * 对每个渠道：
+ * - 读取 openclaw.json 中 channels.{name} 的配置
+ * - 显示启用/禁用状态、连接模式、策略等
+ * - 支持编辑配置（Modal 表单）
+ *
+ * 渠道配置直接写入 openclaw.json 的 channels 对象
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Tooltip, Switch, Divider, Select, Tabs } from 'antd'
 import {

@@ -1,3 +1,11 @@
+/**
+ * 错误边界组件
+ *
+ * 捕获子组件渲染时的 JavaScript 错误，显示友好的错误页面，
+ * 防止整个应用白屏。用户可以点击"重新加载"恢复。
+ *
+ * 放置在 App.tsx 的最外层，包裹所有路由。
+ */
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { Button, Result } from 'antd'
 

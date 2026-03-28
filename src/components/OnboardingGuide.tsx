@@ -1,3 +1,14 @@
+/**
+ * 首次使用引导组件
+ *
+ * 用户首次打开应用时显示的 Modal 引导：
+ * - 检测 Node.js 版本（>= 22.14）
+ * - 检测 OpenClaw 是否安装
+ * - 检测 Gateway 是否运行（未运行可一键启动）
+ *
+ * 完成后写入 localStorage('ocm-onboarding-completed')，不再显示。
+ * 通过删除该 localStorage 键可重新触发引导。
+ */
 import { useState, useEffect } from 'react'
 import { Modal, Steps, Button, Space, Alert, Spin, Tag } from 'antd'
 import {

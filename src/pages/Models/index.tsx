@@ -1,3 +1,20 @@
+/**
+ * 模型配置页面
+ *
+ * 两个 Tab：
+ * 1. Provider 列表：显示自定义 Provider（CRUD）+ 内置 Provider（openrouter 等）
+ *    - 自定义 Provider：展开显示模型列表，支持添加/编辑/删除
+ *    - 内置 Provider：从 agent 模型引用中解析，只读显示
+ * 2. Agent 模型配置：为每个 Agent 和全局默认设置主模型 + fallback
+ *
+ * 数据流：
+ * loadConfig() → 读取 openclaw.json → 解析 models.providers + agents.list
+ * 修改 → 直接写入 openclaw.json → loadConfig() 刷新
+ *
+ * 内置 Provider 识别逻辑：
+ * 从 agent 模型引用（如 "openrouter/xiaomi/mimo-v2-pro"）中提取 provider 名称，
+ * 与 models.providers 中的自定义 provider 对比，不在其中的视为内置 provider。
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Button, Space, Tag, Modal, Input, Alert, Table, Tooltip, Select, Tabs, Collapse, message } from 'antd'
 import {

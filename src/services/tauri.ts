@@ -1,4 +1,18 @@
-// Tauri 命令封装
+/**
+ * Tauri 命令封装层
+ *
+ * 所有前端与 Rust 后端的交互都通过此文件。每个函数对应一个 Tauri 命令。
+ * 前端页面禁止直接调用 invoke()，必须通过此文件封装。
+ *
+ * 命令分组：
+ * - System: 系统环境检测（Node.js、OpenClaw、Gateway）
+ * - Config: 配置文件读写（openclaw.json）
+ * - Process: 进程管理（Gateway 启动/停止）
+ * - Health: 健康诊断和日志
+ * - Backup: 备份恢复（AES-256-GCM 加密）
+ * - Skills: Skill 管理
+ * - App Info: 应用信息和缓存
+ */
 import { invoke } from '@tauri-apps/api/core'
 
 // System

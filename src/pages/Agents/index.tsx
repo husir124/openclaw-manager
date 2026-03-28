@@ -1,3 +1,14 @@
+/**
+ * Agent 管理页面
+ *
+ * 功能：
+ * - Agent 列表：显示所有已配置的 Agent（从 openclaw.json agents.list 读取）
+ * - 创建向导：4 步流程（基本信息 → 选择平台 → 配置凭证 → 确认创建）
+ * - 删除 Agent：从 agents.list 中移除
+ *
+ * Agent 配置结构：{ id, name, workspace, model, tools, bindings }
+ * 创建时自动添加到 agents.list 和 bindings 数组
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Button, Space, Tag, Empty, Modal, Input, Select, Alert, Steps, Tooltip, Divider, Radio } from 'antd'
 import {

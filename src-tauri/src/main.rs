@@ -1,3 +1,13 @@
+//! OpenClaw Manager - Tauri 后端入口
+//!
+//! 本应用为 OpenClaw 提供图形化管理界面，通过 Tauri IPC 桥接
+//! 前端 React UI 与系统命令、文件操作、进程管理等功能。
+//!
+//! 模块说明：
+//! - commands: 所有 Tauri 命令（前端通过 invoke() 调用）
+//! - error: 统一错误类型 AppError
+//! - platform: 跨平台路径和命令封装
+
 mod commands;
 mod error;
 mod platform;

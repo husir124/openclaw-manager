@@ -1,6 +1,19 @@
+//! 统一错误类型
+//!
+//! 所有 Tauri 命令返回 Result<T, AppError>，前端通过 error.code 区分错误类型，
+//! 通过 error.message 显示用户友好的提示，通过 error.suggestion 提供修复建议。
+//!
+//! 使用 Builder 模式构建错误：
+//! ```rust
+//! AppError::new(ErrorCode::ConfigNotFound, "配置文件不存在")
+//!     .with_detail("~/.openclaw/openclaw.json")
+//!     .with_suggestion("请先运行 openclaw onboard")
+//! ```
+
 use serde::Serialize;
 use std::fmt;
 
+/// 应用错误（序列化后传给前端）
 #[derive(Debug, Serialize, Clone)]
 pub struct AppError {
     pub code: ErrorCode,

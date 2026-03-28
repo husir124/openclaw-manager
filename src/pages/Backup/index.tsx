@@ -1,3 +1,15 @@
+/**
+ * 备份恢复页面
+ *
+ * 功能：
+ * - 创建备份：AES-256-GCM 加密，用户设置密码
+ * - 恢复备份：输入密码解密，恢复配置和 workspace
+ * - 备份列表：显示所有 .ocbak 文件，支持删除
+ * - 进度条：显示备份/恢复进度
+ *
+ * 备份内容：openclaw.json + workspace 目录（可选）
+ * 加密方式：AES-256-GCM + 用户密码派生密钥
+ */
 import { useState, useEffect } from 'react'
 import { Typography, Card, Spin, Space, Tag, Button, Alert, Modal, Input, Progress, Table, Popconfirm, Checkbox, Tooltip, Radio } from 'antd'
 import {
