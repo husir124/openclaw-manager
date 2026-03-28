@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Layout, Menu, Typography, Tag } from 'antd'
+import { useState, useEffect, useCallback } from 'react'
+import { Layout, Menu, Typography, Tag, Space } from 'antd'
 import {
   DashboardOutlined,
   MessageOutlined,
@@ -12,11 +12,16 @@ import {
   SettingOutlined,
   RocketOutlined,
   CodeOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { OnboardingGuide } from '../components/OnboardingGuide'
+import { checkGatewayStatus } from '../services/tauri'
 
 const { Header, Sider, Content } = Layout
-const { Title, Text } = Typography
+const { Title } = Typography
 
 const menuItems = [
   { key: '/setup', icon: <RocketOutlined />, label: 'Setup' },
@@ -32,9 +37,73 @@ const menuItems = [
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ]
 
+type GatewayStatus = 'loading' | 'running' | 'stopped' | 'error'
+
 export default function MainLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('loading')
+  const [gatewayPort, setGatewayPort] = useState<number>(18789)
+
+  // 检查是否需要显示引导
+  useEffect(() => {
+    const completed = localStorage.getItem('ocm-onboarding-completed')
+    if (!completed) {
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  // 检测 Gateway 状态
+  const refreshGatewayStatus = useCallback(async () => {
+    try {
+      const status = await checkGatewayStatus()
+      setGatewayStatus(status.running ? 'running' : 'stopped')
+      setGatewayPort(status.port)
+    } catch {
+      setGatewayStatus('error')
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshGatewayStatus()
+    const timer = setInterval(refreshGatewayStatus, 30000) // 30 秒刷新
+    return () => clearInterval(timer)
+  }, [refreshGatewayStatus])
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false)
+    refreshGatewayStatus()
+  }
+
+  const renderGatewayTag = () => {
+    switch (gatewayStatus) {
+      case 'loading':
+        return (
+          <Tag icon={<LoadingOutlined spin />} color="processing">
+            检测中
+          </Tag>
+        )
+      case 'running':
+        return (
+          <Tag icon={<CheckCircleOutlined />} color="success">
+            Gateway 运行中 :{gatewayPort}
+          </Tag>
+        )
+      case 'stopped':
+        return (
+          <Tag icon={<CloseCircleOutlined />} color="default">
+            Gateway 未运行
+          </Tag>
+        )
+      case 'error':
+        return (
+          <Tag icon={<CloseCircleOutlined />} color="error">
+            Gateway 检测失败
+          </Tag>
+        )
+    }
+  }
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -60,12 +129,18 @@ export default function MainLayout() {
           alignItems: 'center',
         }}>
           <Title level={5} style={{ margin: 0 }}>OpenClaw Manager</Title>
-          <Tag color="green">Gateway 运行中</Tag>
+          <Space>
+            {renderGatewayTag()}
+          </Space>
         </Header>
         <Content style={{ padding: 24, overflow: 'auto', background: '#fafafa' }}>
           <Outlet />
         </Content>
       </Layout>
+
+      {showOnboarding && (
+        <OnboardingGuide onComplete={handleOnboardingComplete} />
+      )}
     </Layout>
   )
 }
