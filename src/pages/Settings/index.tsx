@@ -28,46 +28,18 @@ interface AppSettings {
 
   // 界面
   theme: 'light' | 'dark' | 'system'
-  language: 'zh' | 'en'
 
   // 其他
   telemetryEnabled: boolean
   autoUpdateEnabled: boolean
 }
 
-// 主题切换函数
+// 通过 window 调用 ThemeProvider 的 setThemeMode
 function applyTheme(theme: 'light' | 'dark' | 'system') {
-  const root = document.documentElement
-  let isDark = false
-
-  if (theme === 'system') {
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  } else {
-    isDark = theme === 'dark'
+  const t = (window as unknown as Record<string, unknown>).__ocm_theme__ as { setThemeMode?: (m: string) => void } | undefined
+  if (t?.setThemeMode) {
+    t.setThemeMode(theme)
   }
-
-  root.setAttribute('data-theme', isDark ? 'dark' : 'light')
-  document.body.style.background = isDark ? '#141414' : '#fafafa'
-  document.body.style.color = isDark ? '#fff' : '#000'
-
-  if (isDark) {
-    document.body.classList.add('dark')
-    document.body.classList.remove('light')
-  } else {
-    document.body.classList.add('light')
-    document.body.classList.remove('dark')
-  }
-
-  localStorage.setItem('ocm-theme', theme)
-
-  // 触发自定义事件，让 main.tsx 的 ConfigProvider 响应
-  window.dispatchEvent(new Event('theme-change'))
-}
-
-// 语言切换函数
-function applyLanguage(language: 'zh' | 'en') {
-  localStorage.setItem('ocm-language', language)
-  // 注意：完整的 i18n 需要额外的库，这里先存储偏好
 }
 
 export default function SettingsPage() {
@@ -83,7 +55,6 @@ export default function SettingsPage() {
     dmPolicy: 'pairing',
     gatewayAuthMode: 'token',
     theme: 'system',
-    language: 'zh',
     telemetryEnabled: false,
     autoUpdateEnabled: true,
   })
@@ -122,7 +93,6 @@ export default function SettingsPage() {
 
       // 从 localStorage 读取 UI 设置
       const savedTheme = (localStorage.getItem('ocm-theme') || 'system') as AppSettings['theme']
-      const savedLanguage = (localStorage.getItem('ocm-language') || 'zh') as AppSettings['language']
       const savedTelemetry = localStorage.getItem('ocm-telemetry') === 'true'
       const savedAutoUpdate = localStorage.getItem('ocm-auto-update') !== 'false' // 默认 true
 
@@ -132,7 +102,6 @@ export default function SettingsPage() {
         dmPolicy: ((telegramConfig.dmPolicy as string) || 'pairing') as AppSettings['dmPolicy'],
         gatewayAuthMode: ((authConfig.mode as string) || 'token') as AppSettings['gatewayAuthMode'],
         theme: savedTheme,
-        language: savedLanguage,
         telemetryEnabled: savedTelemetry,
         autoUpdateEnabled: savedAutoUpdate,
       })
@@ -199,15 +168,11 @@ export default function SettingsPage() {
 
       // 4. 保存 UI 设置到 localStorage
       localStorage.setItem('ocm-theme', settings.theme)
-      localStorage.setItem('ocm-language', settings.language)
       localStorage.setItem('ocm-telemetry', String(settings.telemetryEnabled))
       localStorage.setItem('ocm-auto-update', String(settings.autoUpdateEnabled))
 
       // 5. 应用主题
       applyTheme(settings.theme)
-
-      // 6. 应用语言
-      applyLanguage(settings.language)
 
       setSuccess('设置保存成功')
     } catch (err) {
@@ -418,24 +383,6 @@ export default function SettingsPage() {
                 { label: '浅色', value: 'light' },
                 { label: '深色', value: 'dark' },
                 { label: '跟随系统', value: 'system' },
-              ]}
-              style={{ width: 120 }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Space>
-              <Text>语言</Text>
-              <Tooltip title="界面显示语言（保存后生效）">
-                <QuestionCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-            <Select
-              value={settings.language}
-              onChange={(v) => setSettings({ ...settings, language: v })}
-              options={[
-                { label: '中文', value: 'zh' },
-                { label: 'English', value: 'en' },
               ]}
               style={{ width: 120 }}
             />

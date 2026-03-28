@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Layout, Menu, Typography, Tag, Space } from 'antd'
+import { Layout, Menu, Tag, Space } from 'antd'
 import {
   DashboardOutlined,
   MessageOutlined,
@@ -21,7 +21,6 @@ import { OnboardingGuide } from '../components/OnboardingGuide'
 import { checkGatewayStatus } from '../services/tauri'
 
 const { Header, Sider, Content } = Layout
-const { Title } = Typography
 
 const menuItems = [
   { key: '/setup', icon: <RocketOutlined />, label: 'Setup' },
@@ -46,6 +45,18 @@ export default function MainLayout() {
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('loading')
   const [gatewayPort, setGatewayPort] = useState<number>(18789)
 
+  // 读取主题状态（通过 window 暴露的 ThemeProvider）
+  const [isDark, setIsDark] = useState(false)
+  useEffect(() => {
+    const check = () => {
+      const t = (window as unknown as Record<string, unknown>).__ocm_theme__ as { isDark?: boolean } | undefined
+      setIsDark(t?.isDark ?? false)
+    }
+    check()
+    const timer = setInterval(check, 500)
+    return () => clearInterval(timer)
+  }, [])
+
   // 检查是否需要显示引导
   useEffect(() => {
     const completed = localStorage.getItem('ocm-onboarding-completed')
@@ -67,7 +78,7 @@ export default function MainLayout() {
 
   useEffect(() => {
     refreshGatewayStatus()
-    const timer = setInterval(refreshGatewayStatus, 30000) // 30 秒刷新
+    const timer = setInterval(refreshGatewayStatus, 30000)
     return () => clearInterval(timer)
   }, [refreshGatewayStatus])
 
@@ -107,33 +118,50 @@ export default function MainLayout() {
 
   return (
     <Layout style={{ height: '100vh' }}>
-      <Sider width={200} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-        <div style={{ padding: '16px', textAlign: 'center' }}>
-          <Title level={4} style={{ margin: 0 }}>{'{'} OC {'}'}</Title>
+      <Sider
+        width={200}
+        theme={isDark ? 'dark' : 'light'}
+        style={{
+          borderRight: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
+        }}
+      >
+        <div style={{
+          padding: '16px',
+          textAlign: 'center',
+          color: isDark ? '#fff' : '#000',
+        }}>
+          <span style={{ fontSize: 20, fontWeight: 'bold' }}>{'{'} OC {'}'}</span>
         </div>
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
+          theme={isDark ? 'dark' : 'light'}
           style={{ borderRight: 0 }}
         />
       </Sider>
       <Layout>
         <Header style={{
-          background: '#fff',
+          background: isDark ? '#141414' : '#fff',
           padding: '0 24px',
-          borderBottom: '1px solid #f0f0f0',
+          borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <Title level={5} style={{ margin: 0 }}>OpenClaw Manager</Title>
+          <span style={{ fontSize: 16, fontWeight: 600, color: isDark ? '#fff' : '#000' }}>
+            OpenClaw Manager
+          </span>
           <Space>
             {renderGatewayTag()}
           </Space>
         </Header>
-        <Content style={{ padding: 24, overflow: 'auto', background: '#fafafa' }}>
+        <Content style={{
+          padding: 24,
+          overflow: 'auto',
+          background: isDark ? '#141414' : '#f5f5f5',
+        }}>
           <Outlet />
         </Content>
       </Layout>
