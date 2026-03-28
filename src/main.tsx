@@ -69,6 +69,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ConfigProvider
+      key={isDark ? 'dark' : 'light'}
       locale={zhCN}
       theme={{
         algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,

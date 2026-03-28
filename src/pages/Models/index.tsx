@@ -13,12 +13,25 @@ import {
   EyeInvisibleOutlined,
   EyeOutlined,
   QuestionCircleOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
 import { readConfig, writeConfig } from '../../services/tauri'
 
 const { Title, Text } = Typography
 const { Password } = Input
 const { Panel } = Collapse
+
+// 已知的 OpenClaw 内置 provider
+const BUILTIN_PROVIDERS: Record<string, { name: string; description: string }> = {
+  openrouter: { name: 'OpenRouter', description: '多模型聚合平台，支持数百种模型' },
+  openai: { name: 'OpenAI', description: 'GPT-4o, o1, Codex 等' },
+  anthropic: { name: 'Anthropic', description: 'Claude 系列模型' },
+  deepseek: { name: 'DeepSeek', description: 'DeepSeek 系列模型' },
+  moonshot: { name: 'Moonshot (Kimi)', description: 'Kimi 系列模型' },
+  google: { name: 'Google', description: 'Gemini 系列模型' },
+  xiaomi: { name: 'Xiaomi', description: '小米大模型' },
+  ollama: { name: 'Ollama', description: '本地模型运行' },
+}
 
 // Provider + 模型
 interface ModelInfo {
@@ -36,6 +49,7 @@ interface Provider {
   apiKey: string
   api: string
   models: ModelInfo[]
+  isBuiltin: boolean  // 是否为内置 provider
 }
 
 // Agent 模型配置
@@ -98,8 +112,8 @@ export default function ModelsPage() {
       const defaultsModel = (defaultsConfig.model as Record<string, unknown>) || {}
       const agentsList = (agentsConfig.list as Array<Record<string, unknown>>) || []
 
-      // 解析 providers
-      const providerList: Provider[] = Object.entries(providersConfig).map(([id, cfg]) => {
+      // 1. 解析自定义 providers（models.providers 中的）
+      const customProviders: Provider[] = Object.entries(providersConfig).map(([id, cfg]) => {
         const c = cfg as Record<string, unknown>
         const models = (c.models as Array<Record<string, unknown>>) || []
         return {
@@ -115,10 +129,77 @@ export default function ModelsPage() {
             contextWindow: (m.contextWindow as number) || 128000,
             maxTokens: (m.maxTokens as number) || 4096,
           })),
+          isBuiltin: false,
         }
       })
 
-      // 解析 agent 模型配置
+      // 2. 从 agent 模型引用中提取所有 provider 名称
+      const allPrimaryModels = [
+        (defaultsModel.primary as string) || '',
+        ...agentsList.map(a => {
+          const m = (a.model as Record<string, unknown>) || {}
+          return (m.primary as string) || ''
+        }),
+      ]
+      const allFallbackModels = [
+        ...((defaultsModel.fallbacks as string[]) || []),
+        ...agentsList.flatMap(a => {
+          const m = (a.model as Record<string, unknown>) || {}
+          return (m.fallbacks as string[]) || []
+        }),
+      ]
+      const allModelRefs = [...allPrimaryModels, ...allFallbackModels].filter(Boolean)
+
+      // 3. 提取所有 provider 名称（格式 provider/modelId）
+      const referencedProviderIds = new Set<string>()
+      for (const ref of allModelRefs) {
+        const slashIdx = ref.indexOf('/')
+        if (slashIdx > 0) {
+          referencedProviderIds.add(ref.substring(0, slashIdx))
+        }
+      }
+
+      // 4. 提取每个内置 provider 被引用的模型 ID
+      const builtinProviderModels = new Map<string, Set<string>>()
+      for (const ref of allModelRefs) {
+        const slashIdx = ref.indexOf('/')
+        if (slashIdx > 0) {
+          const providerId = ref.substring(0, slashIdx)
+          const modelId = ref.substring(slashIdx + 1)
+          if (!builtinProviderModels.has(providerId)) {
+            builtinProviderModels.set(providerId, new Set())
+          }
+          builtinProviderModels.get(providerId)!.add(modelId)
+        }
+      }
+
+      // 5. 合并：自定义 provider + 内置 provider
+      const customProviderIds = new Set(customProviders.map(p => p.id))
+      const builtinProviders: Provider[] = []
+
+      for (const providerId of referencedProviderIds) {
+        if (!customProviderIds.has(providerId)) {
+          const builtinInfo = BUILTIN_PROVIDERS[providerId]
+          const modelIds = builtinProviderModels.get(providerId) || new Set()
+          builtinProviders.push({
+            id: providerId,
+            name: builtinInfo?.name || providerId,
+            baseUrl: '',
+            apiKey: '',
+            api: 'builtin',
+            models: Array.from(modelIds).map(mid => ({
+              id: mid,
+              name: mid,
+              reasoning: false,
+              contextWindow: 0,
+              maxTokens: 0,
+            })),
+            isBuiltin: true,
+          })
+        }
+      }
+
+      // 6. 解析 agent 模型配置
       const agentModels: AgentModelConfig[] = agentsList.map(a => {
         const model = (a.model as Record<string, unknown>) || {}
         return {
@@ -129,7 +210,7 @@ export default function ModelsPage() {
         }
       })
 
-      setProviders(providerList)
+      setProviders([...customProviders, ...builtinProviders])
       setAgents(agentModels)
       setDefaultPrimary((defaultsModel.primary as string) || '')
       setDefaultFallbacks((defaultsModel.fallbacks as string[]) || [])
@@ -166,7 +247,7 @@ export default function ModelsPage() {
         const existingModels = (existing.models as Array<Record<string, unknown>>) || []
         providersConfig[formProviderId] = {
           baseUrl: formBaseUrl,
-          apiKey: formApiKey || existing.apiKey,
+          apiKey: formApiKey || (existing.apiKey as string) || '',
           api: formApi,
           name: formProviderName || formProviderId,
           models: existingModels,
@@ -218,11 +299,15 @@ export default function ModelsPage() {
   }
 
   const handleEditProvider = (provider: Provider) => {
+    if (provider.isBuiltin) {
+      setError('内置 Provider 不可编辑，OpenClaw 自动管理')
+      return
+    }
     setEditingProvider(provider)
     setFormProviderId(provider.id)
     setFormProviderName(provider.name)
     setFormBaseUrl(provider.baseUrl)
-    setFormApiKey('') // 不回显 API Key
+    setFormApiKey('')
     setFormApi(provider.api)
     setShowAddProvider(true)
   }
@@ -308,7 +393,6 @@ export default function ModelsPage() {
       const agentsConfig = (parsed.agents as Record<string, unknown>) || {}
 
       if (agentId === '__defaults__') {
-        // 更新全局默认
         const defaults = (agentsConfig.defaults as Record<string, unknown>) || {}
         const model = (defaults.model as Record<string, unknown>) || {}
         model.primary = primary
@@ -316,7 +400,6 @@ export default function ModelsPage() {
         defaults.model = model
         agentsConfig.defaults = defaults
       } else {
-        // 更新特定 agent
         const agentsList = (agentsConfig.list as Array<Record<string, unknown>>) || []
         const agent = agentsList.find(a => a.id === agentId)
         if (agent) {
@@ -339,6 +422,10 @@ export default function ModelsPage() {
   // ========== 测试连通性 ==========
 
   const handleTestProvider = async (provider: Provider) => {
+    if (provider.isBuiltin) {
+      message.info('内置 Provider 的连通性由 OpenClaw 管理')
+      return
+    }
     setTestingProvider(provider.id)
     try {
       const response = await fetch(`${provider.baseUrl}/models`, {
@@ -366,6 +453,9 @@ export default function ModelsPage() {
     )
   }
 
+  const customProviders = providers.filter(p => !p.isBuiltin)
+  const builtinProviders = providers.filter(p => p.isBuiltin)
+
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       {/* 标题栏 */}
@@ -374,7 +464,8 @@ export default function ModelsPage() {
           <CloudServerOutlined /> 模型配置
         </Title>
         <Space>
-          <Tag color="blue">{providers.length} 个 Provider</Tag>
+          <Tag color="blue">{customProviders.length} 自定义</Tag>
+          <Tag color="purple">{builtinProviders.length} 内置</Tag>
           <Tag color="green">{providers.reduce((s, p) => s + p.models.length, 0)} 个模型</Tag>
           <Button icon={<ReloadOutlined />} onClick={loadConfig}>刷新</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetProviderForm(); setShowAddProvider(true) }}>
@@ -393,91 +484,148 @@ export default function ModelsPage() {
           {
             key: 'providers',
             label: <Space><CloudServerOutlined />Provider 列表</Space>,
-            children: providers.length === 0 ? (
-              <Card>
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                  <CloudServerOutlined style={{ fontSize: 48, color: '#ccc' }} />
-                  <div style={{ marginTop: 16, color: '#999' }}>暂无 Provider，请先添加</div>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetProviderForm(); setShowAddProvider(true) }} style={{ marginTop: 16 }}>
-                    添加 Provider
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              <Collapse>
-                {providers.map(provider => (
-                  <Panel
-                    key={provider.id}
-                    header={
-                      <Space>
-                        <CloudServerOutlined />
-                        <Text strong>{provider.name}</Text>
-                        <Tag>{provider.api}</Tag>
-                        <Tag color="blue">{provider.models.length} 个模型</Tag>
-                        <Text code style={{ fontSize: 12 }}>{provider.baseUrl}</Text>
-                      </Space>
-                    }
-                    extra={
-                      <Space onClick={e => e.stopPropagation()}>
-                        <Tooltip title="测试连通性">
-                          <Button size="small" icon={<ExperimentOutlined />}
-                            loading={testingProvider === provider.id}
-                            onClick={() => handleTestProvider(provider)} />
-                        </Tooltip>
-                        <Tooltip title="编辑">
-                          <Button size="small" icon={<EditOutlined />}
-                            onClick={() => handleEditProvider(provider)} />
-                        </Tooltip>
-                        <Tooltip title="删除">
-                          <Button size="small" danger icon={<DeleteOutlined />}
-                            onClick={() => handleDeleteProvider(provider.id)} />
-                        </Tooltip>
-                      </Space>
-                    }
-                  >
-                    <div style={{ marginBottom: 12 }}>
-                      <Space>
-                        <KeyOutlined />
-                        <Text type="secondary">API Key：</Text>
-                        <Text>{provider.apiKey ? '••••••••••••' : <Text type="warning">未配置</Text>}</Text>
-                      </Space>
-                    </div>
+            children: (
+              <Space direction="vertical" style={{ width: '100%' }} size="large">
+                {/* 自定义 Provider */}
+                {customProviders.length > 0 && (
+                  <div>
+                    <Text strong style={{ marginBottom: 8, display: 'block' }}>自定义 Provider</Text>
+                    <Collapse>
+                      {customProviders.map(provider => (
+                        <Panel
+                          key={provider.id}
+                          header={
+                            <Space>
+                              <CloudServerOutlined />
+                              <Text strong>{provider.name}</Text>
+                              <Tag>{provider.api}</Tag>
+                              <Tag color="blue">{provider.models.length} 个模型</Tag>
+                              <Text code style={{ fontSize: 12 }}>{provider.baseUrl}</Text>
+                            </Space>
+                          }
+                          extra={
+                            <Space onClick={e => e.stopPropagation()}>
+                              <Tooltip title="测试连通性">
+                                <Button size="small" icon={<ExperimentOutlined />}
+                                  loading={testingProvider === provider.id}
+                                  onClick={() => handleTestProvider(provider)} />
+                              </Tooltip>
+                              <Tooltip title="编辑">
+                                <Button size="small" icon={<EditOutlined />}
+                                  onClick={() => handleEditProvider(provider)} />
+                              </Tooltip>
+                              <Tooltip title="删除">
+                                <Button size="small" danger icon={<DeleteOutlined />}
+                                  onClick={() => handleDeleteProvider(provider.id)} />
+                              </Tooltip>
+                            </Space>
+                          }
+                        >
+                          <div style={{ marginBottom: 12 }}>
+                            <Space>
+                              <KeyOutlined />
+                              <Text type="secondary">API Key：</Text>
+                              <Text>{provider.apiKey ? '••••••••••••' : <Text type="warning">未配置</Text>}</Text>
+                            </Space>
+                          </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text strong>模型列表</Text>
-                      <Button size="small" type="link" icon={<PlusOutlined />}
-                        onClick={() => { setTargetProviderId(provider.id); setShowAddModel(true) }}>
-                        添加模型
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <Text strong>模型列表</Text>
+                            <Button size="small" type="link" icon={<PlusOutlined />}
+                              onClick={() => { setTargetProviderId(provider.id); setShowAddModel(true) }}>
+                              添加模型
+                            </Button>
+                          </div>
+
+                          {provider.models.length === 0 ? (
+                            <Text type="secondary">暂无模型，请先添加</Text>
+                          ) : (
+                            <Table
+                              dataSource={provider.models}
+                              rowKey="id"
+                              size="small"
+                              pagination={false}
+                              columns={[
+                                { title: '模型 ID', dataIndex: 'id', key: 'id', render: (id: string) => <Text code>{id}</Text> },
+                                { title: '显示名称', dataIndex: 'name', key: 'name' },
+                                { title: '上下文窗口', dataIndex: 'contextWindow', key: 'cw', render: (v: number) => <Tag>{(v / 1000).toFixed(0)}K</Tag> },
+                                { title: '最大输出', dataIndex: 'maxTokens', key: 'mt', render: (v: number) => <Tag>{v}</Tag> },
+                                {
+                                  title: '操作', key: 'action',
+                                  render: (_: unknown, record: ModelInfo) => (
+                                    <Button size="small" danger onClick={() => handleDeleteModel(provider.id, record.id)}>
+                                      删除
+                                    </Button>
+                                  ),
+                                },
+                              ]}
+                            />
+                          )}
+                        </Panel>
+                      ))}
+                    </Collapse>
+                  </div>
+                )}
+
+                {/* 内置 Provider */}
+                {builtinProviders.length > 0 && (
+                  <div>
+                    <Space style={{ marginBottom: 8 }}>
+                      <Text strong>内置 Provider</Text>
+                      <Tooltip title="OpenClaw 内置的 Provider，模型在运行时动态发现，此处显示当前配置中引用的模型">
+                        <InfoCircleOutlined style={{ color: '#999' }} />
+                      </Tooltip>
+                    </Space>
+                    <Collapse>
+                      {builtinProviders.map(provider => {
+                        const builtinInfo = BUILTIN_PROVIDERS[provider.id]
+                        return (
+                          <Panel
+                            key={provider.id}
+                            header={
+                              <Space>
+                                <CloudServerOutlined />
+                                <Text strong>{provider.name}</Text>
+                                <Tag color="purple">内置</Tag>
+                                {provider.models.length > 0 && <Tag color="blue">{provider.models.length} 个已引用模型</Tag>}
+                                {builtinInfo && <Text type="secondary" style={{ fontSize: 12 }}>{builtinInfo.description}</Text>}
+                              </Space>
+                            }
+                          >
+                            {provider.models.length === 0 ? (
+                              <Text type="secondary">当前配置中未引用此 Provider 的模型</Text>
+                            ) : (
+                              <div>
+                                <Text type="secondary" style={{ marginBottom: 8, display: 'block' }}>
+                                  以下模型在 Agent 配置中被引用（OpenClaw 运行时自动管理完整模型列表）：
+                                </Text>
+                                <Space wrap>
+                                  {provider.models.map(m => (
+                                    <Tag key={m.id} color="blue">{m.id}</Tag>
+                                  ))}
+                                </Space>
+                              </div>
+                            )}
+                          </Panel>
+                        )
+                      })}
+                    </Collapse>
+                  </div>
+                )}
+
+                {/* 空状态 */}
+                {providers.length === 0 && (
+                  <Card>
+                    <div style={{ textAlign: 'center', padding: 40 }}>
+                      <CloudServerOutlined style={{ fontSize: 48, color: '#ccc' }} />
+                      <div style={{ marginTop: 16, color: '#999' }}>暂无 Provider，请先添加</div>
+                      <Button type="primary" icon={<PlusOutlined />} onClick={() => { resetProviderForm(); setShowAddProvider(true) }} style={{ marginTop: 16 }}>
+                        添加 Provider
                       </Button>
                     </div>
-
-                    {provider.models.length === 0 ? (
-                      <Text type="secondary">暂无模型，请先添加</Text>
-                    ) : (
-                      <Table
-                        dataSource={provider.models}
-                        rowKey="id"
-                        size="small"
-                        pagination={false}
-                        columns={[
-                          { title: '模型 ID', dataIndex: 'id', key: 'id', render: (id: string) => <Text code>{id}</Text> },
-                          { title: '显示名称', dataIndex: 'name', key: 'name' },
-                          { title: '上下文窗口', dataIndex: 'contextWindow', key: 'cw', render: (v: number) => <Tag>{(v / 1000).toFixed(0)}K</Tag> },
-                          { title: '最大输出', dataIndex: 'maxTokens', key: 'mt', render: (v: number) => <Tag>{v}</Tag> },
-                          {
-                            title: '操作', key: 'action',
-                            render: (_: unknown, record: ModelInfo) => (
-                              <Button size="small" danger onClick={() => handleDeleteModel(provider.id, record.id)}>
-                                删除
-                              </Button>
-                            ),
-                          },
-                        ]}
-                      />
-                    )}
-                  </Panel>
-                ))}
-              </Collapse>
+                  </Card>
+                )}
+              </Space>
             )
           },
 
@@ -594,7 +742,7 @@ export default function ModelsPage() {
           <div>
             <Text>选择 Provider <Text type="danger">*</Text></Text>
             <Select value={targetProviderId} onChange={setTargetProviderId} placeholder="选择 Provider"
-              options={providers.map(p => ({ label: p.name, value: p.id }))}
+              options={customProviders.map(p => ({ label: p.name, value: p.id }))}
               style={{ width: '100%', marginTop: 4 }} />
           </div>
           <div>
@@ -635,7 +783,6 @@ function AgentModelCard({ agent, modelOptions, onSave }: AgentModelCardProps) {
   const [primary, setPrimary] = useState(agent.primary)
   const [fallbacks, setFallbacks] = useState<string[]>(agent.fallbacks)
 
-  // 同步外部数据
   useEffect(() => {
     setPrimary(agent.primary)
     setFallbacks(agent.fallbacks)
@@ -659,7 +806,7 @@ function AgentModelCard({ agent, modelOptions, onSave }: AgentModelCardProps) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space>
             <Text>主模型</Text>
-            <Tooltip title="Agent 使用的主要模型">
+            <Tooltip title="Agent 使用的主要模型，格式：provider/modelId">
               <QuestionCircleOutlined style={{ color: '#999' }} />
             </Tooltip>
           </Space>
