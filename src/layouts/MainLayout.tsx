@@ -19,6 +19,7 @@ import {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { OnboardingGuide } from '../components/OnboardingGuide'
 import { checkGatewayStatus } from '../services/tauri'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Header, Sider, Content } = Layout
 
@@ -41,21 +42,10 @@ type GatewayStatus = 'loading' | 'running' | 'stopped' | 'error'
 export default function MainLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isDark } = useTheme()
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('loading')
   const [gatewayPort, setGatewayPort] = useState<number>(18789)
-
-  // 读取主题状态（通过 window 暴露的 ThemeProvider）
-  const [isDark, setIsDark] = useState(false)
-  useEffect(() => {
-    const check = () => {
-      const t = (window as unknown as Record<string, unknown>).__ocm_theme__ as { isDark?: boolean } | undefined
-      setIsDark(t?.isDark ?? false)
-    }
-    check()
-    const timer = setInterval(check, 500)
-    return () => clearInterval(timer)
-  }, [])
 
   // 检查是否需要显示引导
   useEffect(() => {
