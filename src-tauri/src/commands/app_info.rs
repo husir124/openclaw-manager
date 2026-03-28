@@ -54,22 +54,34 @@ pub async fn clear_cache() -> Result<String, AppError> {
 pub async fn get_disk_usage() -> Result<DiskUsage, AppError> {
     let config_dir = crate::platform::config_dir();
 
-    let total_size = calculate_dir_size(&config_dir).unwrap_or(0);
-
-    // 获取各目录大小
+    // 只计算特定子目录，避免遍历整个 .openclaw（包含 extensions/sessions 等大目录）
     let logs_size = calculate_dir_size(&config_dir.join("logs")).unwrap_or(0);
     let backups_size = calculate_dir_size(&config_dir.join("backups")).unwrap_or(0);
     let workspace_size = calculate_dir_size(&config_dir.join("workspace")).unwrap_or(0);
+
+    // 计算所有 workspace-* 目录
+    let mut all_workspace_size = workspace_size;
+    if let Ok(entries) = std::fs::read_dir(&config_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("workspace-") && entry.path().is_dir() {
+                all_workspace_size += calculate_dir_size(&entry.path()).unwrap_or(0);
+            }
+        }
+    }
+
+    // 总大小 = logs + backups + 所有 workspace（不遍历 extensions/sessions 等）
+    let total_size = logs_size + backups_size + all_workspace_size;
 
     Ok(DiskUsage {
         total_bytes: total_size,
         logs_bytes: logs_size,
         backups_bytes: backups_size,
-        workspace_bytes: workspace_size,
+        workspace_bytes: all_workspace_size,
         formatted_total: format_bytes(total_size),
         formatted_logs: format_bytes(logs_size),
         formatted_backups: format_bytes(backups_size),
-        formatted_workspace: format_bytes(workspace_size),
+        formatted_workspace: format_bytes(all_workspace_size),
     })
 }
 
