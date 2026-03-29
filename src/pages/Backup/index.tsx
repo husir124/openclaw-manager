@@ -23,11 +23,9 @@ import {
   EyeInvisibleOutlined,
   EyeOutlined,
   QuestionCircleOutlined,
-  FileTextOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { Password } = Input
 
 interface BackupFile {
@@ -310,6 +308,25 @@ export default function BackupPage() {
           </Button>
         </Space>
       </div>
+
+      {error && (
+        <Alert
+          type="error"
+          message={error}
+          closable
+          onClose={() => setError(null)}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+      {success && (
+        <Alert
+          type="success"
+          message={success}
+          closable
+          onClose={() => setSuccess(null)}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* Backup Progress */}
       {creatingBackup && (

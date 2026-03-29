@@ -7,12 +7,12 @@
  * - 左侧菜单：11 个页面的导航
  * - Header：应用标题 + Gateway 状态标签（60 秒自动刷新）
  * - OnboardingGuide：首次使用引导弹窗
- * - 主题适配：通过 useTheme() 响应暗色/浅色主题切换
+ * - 主题适配：通过 antd token 和 Sider theme 属性自动适配
  *
  * 所有子页面通过 <Outlet /> 渲染在内容区
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Layout, Menu, Tag, Space } from 'antd'
+import { Layout, Menu, Tag, Space, theme as antdTheme } from 'antd'
 import {
   DashboardOutlined,
   MessageOutlined,
@@ -32,7 +32,7 @@ import {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { OnboardingGuide } from '../components/OnboardingGuide'
 import { checkGatewayStatus } from '../services/tauri'
-import { useTheme } from '../main'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Header, Sider, Content } = Layout
 
@@ -56,19 +56,16 @@ export default function MainLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isDark } = useTheme()
+  const { token } = antdTheme.useToken()
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('loading')
   const [gatewayPort, setGatewayPort] = useState<number>(18789)
 
-  // 检查是否需要显示引导
   useEffect(() => {
     const completed = localStorage.getItem('ocm-onboarding-completed')
-    if (!completed) {
-      setShowOnboarding(true)
-    }
+    if (!completed) setShowOnboarding(true)
   }, [])
 
-  // 检测 Gateway 状态
   const refreshGatewayStatus = useCallback(async () => {
     try {
       const status = await checkGatewayStatus()
@@ -81,7 +78,7 @@ export default function MainLayout() {
 
   useEffect(() => {
     refreshGatewayStatus()
-    const timer = setInterval(refreshGatewayStatus, 60000) // 60 秒
+    const timer = setInterval(refreshGatewayStatus, 60000)
     return () => clearInterval(timer)
   }, [refreshGatewayStatus])
 
@@ -93,29 +90,13 @@ export default function MainLayout() {
   const renderGatewayTag = () => {
     switch (gatewayStatus) {
       case 'loading':
-        return (
-          <Tag icon={<LoadingOutlined spin />} color="processing">
-            检测中
-          </Tag>
-        )
+        return <Tag icon={<LoadingOutlined spin />} color="processing">检测中</Tag>
       case 'running':
-        return (
-          <Tag icon={<CheckCircleOutlined />} color="success">
-            Gateway 运行中 :{gatewayPort}
-          </Tag>
-        )
+        return <Tag icon={<CheckCircleOutlined />} color="success">Gateway 运行中 :{gatewayPort}</Tag>
       case 'stopped':
-        return (
-          <Tag icon={<CloseCircleOutlined />} color="default">
-            Gateway 未运行
-          </Tag>
-        )
+        return <Tag icon={<CloseCircleOutlined />} color="default">Gateway 未运行</Tag>
       case 'error':
-        return (
-          <Tag icon={<CloseCircleOutlined />} color="error">
-            Gateway 检测失败
-          </Tag>
-        )
+        return <Tag icon={<CloseCircleOutlined />} color="error">Gateway 检测失败</Tag>
     }
   }
 
@@ -124,16 +105,16 @@ export default function MainLayout() {
       <Sider
         width={200}
         theme={isDark ? 'dark' : 'light'}
-        style={{
-          borderRight: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
-        }}
+        style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}
       >
         <div style={{
-          padding: '16px',
+          padding: 16,
           textAlign: 'center',
-          color: isDark ? '#fff' : '#000',
+          color: token.colorText,
+          fontSize: 20,
+          fontWeight: 'bold',
         }}>
-          <span style={{ fontSize: 20, fontWeight: 'bold' }}>Hi OpenClaw</span>
+          Hi OpenClaw
         </div>
         <Menu
           mode="inline"
@@ -146,24 +127,22 @@ export default function MainLayout() {
       </Sider>
       <Layout>
         <Header style={{
-          background: isDark ? '#141414' : '#fff',
+          background: token.colorBgContainer,
           padding: '0 24px',
-          borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: isDark ? '#fff' : '#000' }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: token.colorText }}>
             OpenClaw Manager
           </span>
-          <Space>
-            {renderGatewayTag()}
-          </Space>
+          <Space>{renderGatewayTag()}</Space>
         </Header>
         <Content style={{
           padding: 24,
           overflow: 'auto',
-          background: isDark ? '#141414' : '#f5f5f5',
+          background: token.colorBgLayout,
         }}>
           <Outlet />
         </Content>

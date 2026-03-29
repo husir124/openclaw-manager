@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Space, Tag, Button, Alert, Divider, List, Progress, Modal, Input, Tooltip } from 'antd'
+import { Typography, Card, Spin, Space, Tag, Button, Alert, List, Modal, Input, Tooltip } from 'antd'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons'
 import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, startGateway } from '../../services/tauri'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 interface DiagnosticItem {
   id: string
@@ -39,7 +39,7 @@ export default function HealthPage() {
   const [logLines, setLogLines] = useState(50)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [refreshInterval, setRefreshInterval] = useState(60) // 秒（默认 1 分钟）
+  const refreshInterval = 60 // 秒（默认 1 分钟）
 
   const runDiagnosis = async () => {
     setLoading(true)

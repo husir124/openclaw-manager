@@ -161,7 +161,7 @@ describe('tauri service', () => {
   describe('stopGateway', () => {
     it('should stop gateway', async () => {
       mockInvoke.mockResolvedValue('Gateway stopped')
-      const result = await stopGateway()
+      await stopGateway()
       expect(mockInvoke).toHaveBeenCalledWith('stop_gateway')
     })
   })

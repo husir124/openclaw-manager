@@ -34,7 +34,7 @@ interface CheckResult {
 }
 
 export function OnboardingGuide({ onComplete }: OnboardingGuideProps) {
-  const [currentStep, setCurrentStep] = useState(0)
+  const currentStep = 0 // 固定为第一步（环境检测），后续步骤由用户手动完成
   const [visible, setVisible] = useState(true)
 
   // 检测结果

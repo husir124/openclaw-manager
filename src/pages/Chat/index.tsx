@@ -7,7 +7,7 @@
 import { Card, Typography, Button, Space, Alert } from 'antd'
 import { MessageOutlined, LinkOutlined, ApiOutlined } from '@ant-design/icons'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Paragraph } = Typography
 
 export default function ChatPage() {
   const gatewayUrl = 'http://127.0.0.1:18789'

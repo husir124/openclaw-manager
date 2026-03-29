@@ -22,7 +22,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { checkNodeVersion, checkOpenClawInstalled, checkGatewayStatus, listConfigSections } from '../../services/tauri'
 
-const { Title, Text } = Typography
+const { Title } = Typography
 
 interface SystemStatus {
   node: { installed: boolean; version: string | null }

@@ -9,13 +9,11 @@
  * 支持删除 skill（需确认弹窗）
  */
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Button, Space, Tag, Alert, Empty, Tooltip, Divider, Tabs, Modal, Select, Input, Badge, Popconfirm } from 'antd'
+import { Typography, Card, Spin, Button, Space, Tag, Alert, Empty, Divider, Tabs, Modal, Select, Input, Badge, Popconfirm } from 'antd'
 import {
   AppstoreOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
-  ExclamationCircleOutlined,
   QuestionCircleOutlined,
   CloudDownloadOutlined,
   FolderOutlined,
@@ -24,9 +22,8 @@ import {
   GlobalOutlined,
   SortAscendingOutlined,
   DeleteOutlined,
-  StopOutlined,
 } from '@ant-design/icons'
-import { listAllAgentsSkills, deleteSkill, type AgentSkillsInfo, type SkillInfo } from '../../services/tauri'
+import { listAllAgentsSkills, deleteSkill, type AgentSkillsInfo } from '../../services/tauri'
 
 const { Title, Text, Paragraph, Link } = Typography
 const { Search } = Input
@@ -83,7 +80,6 @@ export default function SkillsPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [showInstallModal, setShowInstallModal] = useState(false)
   const [selectedClawhubSkill, setSelectedClawhubSkill] = useState<ClawHubSkill | null>(null)
-  const [installTarget, setInstallTarget] = useState('main')
 
   // 删除状态
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -431,10 +427,9 @@ export default function SkillsPage() {
                         <Button
                           size="small"
                           icon={<CloudDownloadOutlined />}
-                          disabled
-                          title="安装功能即将上线"
+                          onClick={() => { setSelectedClawhubSkill(skill); setShowInstallModal(true) }}
                         >
-                          安装（即将上线）
+                          安装
                         </Button>
                       )}
                     </Card>

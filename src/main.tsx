@@ -1,39 +1,19 @@
 /**
  * OpenClaw Manager - 前端入口
  *
- * 渲染层次：React.StrictMode → BrowserRouter → ThemeProvider → ConfigProvider → App
+ * 渲染层次：React.StrictMode → BrowserRouter → ThemeProvider → App
  *
- * 主题切换原理：
- * - ThemeProvider 管理 isDark 状态（light/dark/system）
- * - ConfigProvider 通过 key={String(isDark)} 强制重建，确保 antd 暗色算法完全生效
- * - 所有组件通过 useTheme() hook 读取当前主题
+ * ThemeProvider 管理 isDark 状态（light/dark/system），
+ * 通过 ConfigProvider 的 key={String(isDark)} 强制重建，确保 antd 暗色算法完全生效。
  */
 import React, { useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import { ThemeContext, type ThemeMode } from './contexts/ThemeContext'
 import App from './App'
 import './index.css'
-
-// === Theme ===
-type ThemeMode = 'light' | 'dark' | 'system'
-
-interface ThemeContextType {
-  themeMode: ThemeMode
-  isDark: boolean
-  setThemeMode: (mode: ThemeMode) => void
-}
-
-const ThemeContext = React.createContext<ThemeContextType>({
-  themeMode: 'system',
-  isDark: false,
-  setThemeMode: () => {},
-})
-
-export function useTheme() {
-  return React.useContext(ThemeContext)
-}
 
 function resolveTheme(mode: ThemeMode): boolean {
   if (mode === 'system') {
@@ -64,7 +44,6 @@ function ThemeProvider({ children }: { children: ReactNode }) {
     setIsDark(resolveTheme(mode))
   }, [])
 
-  // Apply body styles
   useEffect(() => {
     const root = document.documentElement
     if (isDark) {
@@ -80,7 +59,6 @@ function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ themeMode, isDark, setThemeMode }), [themeMode, isDark, setThemeMode])
 
-  // Use boolean key to force full remount on theme change
   return (
     <ThemeContext.Provider value={value}>
       <ConfigProvider

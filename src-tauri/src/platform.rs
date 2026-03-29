@@ -9,7 +9,8 @@
 //! 所有模块应通过此模块获取路径，禁止硬编码。
 
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::Duration;
 
 /// OpenClaw 配置目录
 pub fn config_dir() -> PathBuf {
@@ -81,8 +82,76 @@ pub fn openclaw_bin_path() -> Option<PathBuf> {
 }
 
 /// 执行命令并返回输出（带超时）
-pub fn run_command(program: &str, args: &[&str], _timeout_secs: u64) -> Result<String, super::error::AppError> {
-    exec_command(program, args)
+pub fn run_command(program: &str, args: &[&str], timeout_secs: u64) -> Result<String, super::error::AppError> {
+    use super::error::{AppError, ErrorCode};
+    use std::io::Read;
+
+    let mut cmd = Command::new(program);
+    cmd.args(args);
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| {
+            AppError::new(
+                ErrorCode::CommandFailed,
+                &format!("启动命令失败: {} {}", program, args.join(" ")),
+            )
+            .with_detail(&e.to_string())
+        })?;
+
+    let timeout = Duration::from_secs(timeout_secs);
+    let start = std::time::Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut stdout_buf = Vec::new();
+                let mut stderr_buf = Vec::new();
+                if let Some(mut stdout) = child.stdout.take() {
+                    let _ = stdout.read_to_end(&mut stdout_buf);
+                }
+                if let Some(mut stderr) = child.stderr.take() {
+                    let _ = stderr.read_to_end(&mut stderr_buf);
+                }
+
+                let stdout_str = String::from_utf8_lossy(&stdout_buf).to_string();
+                let stderr_str = String::from_utf8_lossy(&stderr_buf).to_string();
+
+                if status.success() {
+                    return Ok(stdout_str.trim().to_string());
+                } else {
+                    return Err(AppError::new(
+                        ErrorCode::CommandFailed,
+                        &format!("命令执行失败: {}", program),
+                    ).with_detail(&stderr_str));
+                }
+            }
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    return Err(AppError::new(
+                        ErrorCode::CommandFailed,
+                        &format!("命令执行超时 ({}s): {}", timeout_secs, program),
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(e) => {
+                return Err(AppError::new(
+                    ErrorCode::CommandFailed,
+                    &format!("等待命令失败: {}", e),
+                ));
+            }
+        }
+    }
 }
 
 /// 执行命令并返回输出（简洁版本）
@@ -140,5 +209,40 @@ pub fn node_version_meets_minimum(version_str: &str) -> bool {
         major > 22 || (major == 22 && minor >= 14)
     } else {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_version_v24() {
+        assert_eq!(parse_version("v24.14.0"), Some((24, 14, 0)));
+    }
+
+    #[test]
+    fn test_parse_version_v22() {
+        assert_eq!(parse_version("v22.14.0"), Some((22, 14, 0)));
+    }
+
+    #[test]
+    fn test_version_meets_minimum_v24() {
+        assert!(node_version_meets_minimum("v24.14.0"));
+    }
+
+    #[test]
+    fn test_version_meets_minimum_v22_14() {
+        assert!(node_version_meets_minimum("v22.14.0"));
+    }
+
+    #[test]
+    fn test_version_meets_minimum_v20() {
+        assert!(!node_version_meets_minimum("v20.19.0"));
+    }
+
+    #[test]
+    fn test_version_with_carriage_return() {
+        assert!(node_version_meets_minimum("v24.14.0\r\n"));
     }
 }

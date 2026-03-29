@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::platform;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeInfo {
     pub installed: bool,
     pub version: Option<String>,

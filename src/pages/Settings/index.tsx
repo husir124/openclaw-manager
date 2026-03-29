@@ -13,7 +13,7 @@ import {
   FolderOutlined,
 } from '@ant-design/icons'
 import { readConfig, writeConfig, startGateway, stopGateway, checkGatewayStatus, getAppInfo, clearCache, getDiskUsage, type AppInfo, type DiskUsage } from '../../services/tauri'
-import { useTheme } from '../../main'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const { Title, Text, Link } = Typography
 

@@ -16,8 +16,6 @@
  * const result = await gatewayService.request('sessions.list')
  * ```
  */
-import { invoke } from '@tauri-apps/api/core'
-
 // Gateway 配置
 const GATEWAY_URL = 'ws://127.0.0.1:18789'
 const HEARTBEAT_INTERVAL = 30000 // 30 秒
@@ -221,7 +219,7 @@ export class GatewayService {
   }
 
   private rejectAllPending(reason: string): void {
-    for (const [id, pending] of this.pendingRequests) {
+    for (const [, pending] of this.pendingRequests) {
       clearTimeout(pending.timer)
       pending.reject(new Error(reason))
     }

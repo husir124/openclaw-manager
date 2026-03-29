@@ -19,7 +19,7 @@ pub async fn run_diagnosis() -> Result<Vec<DiagnosticItem>, AppError> {
     match node_output {
         Ok(version) => {
             let version = version.trim().to_string();
-            let meets_min = version.starts_with("v24") || version.starts_with("v22.14") || version.starts_with("v22.15") || version.starts_with("v22.16");
+            let meets_min = platform::node_version_meets_minimum(&version);
             results.push(DiagnosticItem {
                 id: "node".to_string(),
                 name: "Node.js 运行环境".to_string(),

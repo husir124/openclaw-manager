@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Spin, Alert, Button, Tag, Space, Input, Divider, List, Modal, Tabs } from 'antd'
+import { Typography, Card, Spin, Alert, Button, Tag, Space, Input, List, Tabs, theme as antdTheme } from 'antd'
 import { ReloadOutlined, SaveOutlined, CodeOutlined, AppstoreOutlined, HistoryOutlined } from '@ant-design/icons'
 import { readConfig, writeConfig, listConfigSections, listConfigBackups, type ConfigSection } from '../../services/tauri'
-import { useTheme } from '../../main'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
 export default function ConfigPage() {
-  const { isDark } = useTheme()
+  const { token } = antdTheme.useToken()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rawContent, setRawContent] = useState('')
@@ -98,19 +97,15 @@ export default function ConfigPage() {
                     <List.Item>
                       <Card
                         size="small"
-                        title={
-                          <Space>
-                            <Tag color="blue">{section.name}</Tag>
-                          </Space>
-                        }
+                        title={<Tag color="blue">{section.name}</Tag>}
                         hoverable
                       >
                         <pre style={{
                           fontSize: 11,
-                          background: isDark ? '#1f1f1f' : '#f5f5f5',
-                          color: isDark ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.88)',
+                          background: token.colorBgTextHover,
+                          color: token.colorText,
                           padding: 8,
-                          borderRadius: 4,
+                          borderRadius: token.borderRadius,
                           maxHeight: 120,
                           overflow: 'auto',
                           margin: 0,

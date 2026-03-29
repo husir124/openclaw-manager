@@ -16,9 +16,8 @@ pub struct BackupFile {
 
 #[tauri::command]
 pub async fn create_backup(password: String) -> Result<String, AppError> {
-    if password.is_empty() {
-        return Err(AppError::new(ErrorCode::ConfigValidationFailed, "备份密码不能为空"));
-    }
+    // 密码强度校验
+    validate_password_strength(&password)?;
 
     BACKUP_PROGRESS.store(0, Ordering::Relaxed);
 
@@ -236,23 +235,41 @@ fn decrypt_data(data: &[u8], password: &str) -> Result<Vec<u8>, String> {
     Ok(plaintext)
 }
 
-/// 从密码派生 256 位密钥
-fn derive_key(password: &str) -> [u8; 32] {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+/// 验证密码强度
+fn validate_password_strength(password: &str) -> Result<(), AppError> {
+    use crate::error::ErrorCode;
 
-    // 简单的密钥派生（生产环境应使用 PBKDF2 或 Argon2）
-    let mut key = [0u8; 32];
-    let password_bytes = password.as_bytes();
-
-    // 使用多次哈希来增强密钥
-    for (i, key_byte) in key.iter_mut().enumerate() {
-        let mut hasher = DefaultHasher::new();
-        password_bytes.hash(&mut hasher);
-        i.hash(&mut hasher);
-        let hash = hasher.finish();
-        *key_byte = (hash & 0xFF) as u8;
+    if password.is_empty() {
+        return Err(AppError::new(ErrorCode::ConfigValidationFailed, "备份密码不能为空"));
+    }
+    if password.len() < 8 {
+        return Err(AppError::new(ErrorCode::ConfigValidationFailed, "备份密码至少需要 8 个字符"));
+    }
+    if password.len() > 128 {
+        return Err(AppError::new(ErrorCode::ConfigValidationFailed, "备份密码不能超过 128 个字符"));
     }
 
+    let has_letter = password.chars().any(|c| c.is_ascii_alphabetic());
+    let has_digit = password.chars().any(|c| c.is_ascii_digit());
+
+    if !has_letter || !has_digit {
+        return Err(AppError::new(
+            ErrorCode::ConfigValidationFailed,
+            "备份密码必须同时包含字母和数字",
+        ));
+    }
+
+    Ok(())
+}
+
+/// 从密码派生 256 位密钥（使用 PBKDF2-SHA256）
+fn derive_key(password: &str) -> [u8; 32] {
+    use pbkdf2::pbkdf2_hmac;
+    use sha2::Sha256;
+
+    let mut key = [0u8; 32];
+    // 使用固定 salt（备份场景，salt 不需要随机，密码本身是唯一因子）
+    let salt = b"openclaw-manager-backup-v1";
+    pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, 100_000, &mut key);
     key
 }
